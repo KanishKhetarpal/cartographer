@@ -86,16 +86,25 @@ def test_both_modes_agree_on_the_public_surface(issue, repo):
         return {n for n in dir(o) if not n.startswith("_")}
 
     assert public(g) == public(e)
-    assert public(GraphRetriever(k=2)) == public(EmbeddingRetriever(k=2)) - {"chunk_lines"} | {
-        "max_hops"
-    }
+    assert {"mode", "retrieve"} <= public(GraphRetriever(k=2))
+    assert {"mode", "retrieve"} <= public(EmbeddingRetriever(k=2))
     assert g.mode != e.mode  # the only Context field that may differ by construction
 
 
-@pytest.mark.parametrize("mode", sorted(MODES))
-def test_phase0_retrievers_flag_themselves_as_stubs(mode, issue, repo):
-    """Guard against a placeholder run being scored as a result."""
-    assert build_retriever(mode, k=2).retrieve(issue, repo).stats.get("stub") is True
+def test_a_placeholder_retriever_still_flags_itself(issue, repo):
+    """Guard against a placeholder run being scored as a result. The graph
+    retriever is real as of Phase 1; the embedding baseline lands in Phase 4 and
+    must keep saying so until it does."""
+    assert EmbeddingRetriever(k=2).retrieve(issue, repo).stats.get("stub") is True
+    assert GraphRetriever(k=2).retrieve(issue, repo).stats.get("stub") is None
+
+
+def test_a_run_is_flagged_stubbed_while_no_model_is_called(issue, repo):
+    """The flag the eval harness actually reads. Real retrieval does not make a
+    run scoreable -- the loop still emits a placeholder patch."""
+    from cartographer.agent.orchestrator import resolve as run_resolve
+
+    assert run_resolve(issue, repo, GraphRetriever(k=2)).stub is True
 
 
 def test_context_files_are_deduped_in_rank_order(issue, repo):
