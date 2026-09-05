@@ -1,10 +1,11 @@
 # Cartographer — session handover
 
-Working context for whoever (or whichever session) picks this up next. Read this first, then
-`README.md` for the pitch and `cartographer_kickoff.md` for the original brief — **the kickoff is
-the source of truth and wins where this file disagrees.**
+Working context for whoever picks this up next. Read this first, then `README.md` for the pitch and
+`cartographer_kickoff.md` for the original brief — **the kickoff is the source of truth and wins
+where this file disagrees.**
 
-Last updated: 2026-09-05, end of Phase 0.
+Repo: <https://github.com/KanishKhetarpal/cartographer> (private). Local: `~/projects/cartographer`.
+Last updated: 2026-09-06, end of Phase 1 core.
 
 ---
 
@@ -14,14 +15,14 @@ The contribution is **the retriever**, not the agent loop. Everything exists to 
 number: graph-grounded retrieval vs. an embedding baseline on SWE-bench Verified, same model, same
 loop, swapped by a flag. A negative result is a result — it gets reported, not buried.
 
-Two invariants that protect that number, both already load-bearing in code:
+Three invariants, all load-bearing in code:
 
-- **`Context` is the only channel out of a retriever.** Both modes construct the same dataclass.
-  `Context.mode` and `Context.stats` are for reporting; if the agent loop ever branches on them,
-  the eval is measuring the branch instead of the graph.
-- **A stubbed run must never be scoreable.** Every placeholder sets `stats["stub"] = True` and the
-  run carries `Result.stub`. The eval harness (Phase 4) must refuse to score on that flag. Test
-  `test_phase0_retrievers_flag_themselves_as_stubs` is the tripwire.
+- **`Context` is the only channel out of a retriever.** Both modes construct the same dataclass. If
+  the agent loop ever branches on `mode` or `stats`, the eval measures the branch, not the graph.
+- **A stubbed run must never be scoreable.** The flag is `Result.stub` (still `True` — no model is
+  called yet). `Context.stats["stub"]` now marks only the *embedding* placeholder.
+- **The retriever must never rank below its own seeds.** Lexical seed extraction is itself a
+  retriever, and for a while the graph scored *worse* than it at small k. See §4.
 
 ---
 
@@ -29,126 +30,165 @@ Two invariants that protect that number, both already load-bearing in code:
 
 | Phase | State |
 |---|---|
-| 0 — scaffold, interfaces, stub CLI, tests | **done**, 4 commits |
-| 1 — code graph engine | **next**, plan agreed but not written |
-| 2 — Docker sandbox + SWE-bench harness | not started; **blocked on Docker daemon**, see §5 |
+| 0 — scaffold, interfaces, stub CLI | **done** |
+| 1 — code graph engine | **core done**; README worked example + `min_confidence` ablation outstanding |
+| 2 — Docker sandbox + SWE-bench harness | not started; **blocked on Docker daemon**, §6 |
 | 3 — LangGraph agent loop | not started |
 | 4 — embedding baseline + the comparison | not started |
 | 5 — README/CI/diagram polish | not started |
 | 6 — MCP server (stretch) | not started |
 
-### What is real vs. what is a placeholder
+**Real now:** `graph/python_analyzer.py`, `graph/graph_builder.py`, `graph/blast_radius.py`,
+`retrieval/seeds.py`, `retrieval/graph_retriever.py`, `eval/graph_hit_rate.py`, `cli.py`.
 
-Real: `retrieval/base.py` (Context, Issue, RepoRef, Snippet, Retriever), `graph/analyzer_base.py`
-(LanguageAnalyzer, SymbolDef, ImportRef, CallRef, BaseRef, FileAnalysis), `cli.py`, the tests.
+**Still a placeholder, and says so in its own docstring:** `retrieval/embedding_retriever.py` and
+`retrieval/stub.py` (delete `stub.py` when the real baseline lands); `agent/orchestrator.py`, which
+is straight-line and emits `STUB_PATCH` with no model call.
 
-Placeholder, and marked as such in its own docstring: `retrieval/stub.py` and both retrievers,
-which return the head of the first *k* `.py` files; `agent/orchestrator.py`, which is straight-line
-and emits `STUB_PATCH` with no model call. **`retrieval/stub.py` gets deleted once both real
-retrievers land** — it exists only so the wiring could be exercised before the intelligence.
-
-Not yet created (deliberately — empty files that pretend to exist are worse than absent ones):
-`graph/python_analyzer.py`, `graph/graph_builder.py`, `graph/blast_radius.py`, `sandbox/`,
-`llm/client.py`, `eval/run_eval.py`, `eval/report.py`, `mcp/server.py`.
+**Not created yet, deliberately** — an empty file that pretends to exist is worse than an absent
+one: `sandbox/`, `llm/client.py`, `eval/run_eval.py`, `eval/report.py`, `mcp/server.py`.
 
 ---
 
-## 3. Design decisions already made (don't relitigate)
+## 3. How the pieces fit
 
-- **Python 3.12, not the 3.14 on PATH.** tree-sitter, faiss and sentence-transformers all lag a
-  release; finding that out mid-eval would mean rebuilding the environment with runs in flight.
-  `py -0p` shows 3.14 / 3.12 / 3.10 installed; `uv venv --python 3.12` picks the right one.
-- **Analyzers are file-local and syntactic.** They report what one file says about itself and never
-  resolve a name across files. All cross-file resolution ("which `foo` did this call mean?") lives
-  in `graph_builder`. This is what makes the TypeScript analyzer a plug-in rather than a rewrite.
-- **`ImportRef.module` keeps the source spelling, dots and all**, with `level` for leading dots.
-  Only the resolver knows where a file sits in the package tree, so a relative import must reach it
-  intact.
-- **Snippet line spans are 1-based inclusive** — matching git, tracebacks and editors, i.e. every
-  tool a human cross-checks a citation against.
-- **Optional dependency groups** (`agent` / `eval` / `embedding`) so the graph engine installs
-  without dragging in LangGraph or Docker.
-- **`results/` is committed.** Run outputs and `REPORT.md` are the deliverable; only
-  `raw_trajectories/` is ignored.
+```
+issue text ──▶ seeds.py ──▶ blast_radius.py ──▶ graph_retriever.py ──▶ Context
+                  │              ▲
+                  └──────────────┴── graph_builder.py ◀── python_analyzer.py
+```
+
+- **Analyzer** is file-local and syntactic. It records what one file says about itself and resolves
+  nothing — it has not seen the other files. A call is stored as the dotted expression the source
+  wrote (`self.foo`, `json.dumps`).
+- **Builder** owns every cross-file decision. Nodes are `path::qualname` (module node is
+  `path::<module>`); edges are `contains` / `imports` / `calls` / `inherits` on a `MultiDiGraph`.
+- **Blast radius** is a multi-source weighted walk. Callers outrank callees, mass is split by degree
+  (so hubs absorb but cannot broadcast), and mass flows outward only.
+- **Retriever** orders evidence-first, then graph, then cuts snippets to a token budget.
 
 ---
 
-## 4. Commands
+## 4. Measured facts — design was driven by these, don't re-derive them
 
-Everything runs through `uv`. It is installed to the user site and **is not on PATH**:
+**Call resolution is undecidable in Python without type inference.** Measured on flask, 3963 call
+sites: only ~10% are a bare name bound by an import or local def; a third of receivers are local
+variables. Hence `confidence` + `via` on every `calls` edge. Tiers: `direct` 1.0, `attribute` 0.9,
+`self_mro` 0.85, `unique_name` 0.5, `ambiguous` 0.25, and **above 3 candidates no edge at all** —
+`get` is called at 385 sites in flask, and noise in a blast radius is worse than a missing edge
+because it silently spends the token budget on wrong files.
+
+**Graph on flask after the resolver fixes:** 83 files, 1663 nodes, 3381 edges, 0.26s.
+`direct` 343 · `attribute` 312 · `self_mro` 121 · `unique_name` 718 · `ambiguous` 268 ·
+`external` 565 (correctly refused) · `too_ambiguous` 510 · `unresolved` 931.
+
+**Phase-1 hit rate — 59 SWE-bench Verified instances** (requests 8, pytest 19, pylint 10,
+xarray 22), file-level recall of the gold patch. `results/phase1_hitrate.json`:
+
+| k | graph | seeds-only |
+|---|---|---|
+| 1 | 0.280 | 0.280 |
+| 3 | 0.412 | 0.412 |
+| 5 | 0.531 | 0.523 |
+| 10 | 0.582 | 0.557 |
+| 20 | **0.740** | 0.557 |
+
+⚠️ **Read that honestly: the graph is worth +18 points at k=20 and roughly nothing below k=5.**
+The thesis is about *tight* context, so this is a weaker result than the pitch wants. Closing the
+small-k gap is the most valuable open work in the project.
+
+Per repo, pylint is the outlier: ~0.13 either way, with 5 of 10 instances seeding **nothing**,
+because those issues quote command-line output rather than naming code. That is a seed-extraction
+gap, not a graph gap.
+
+---
+
+## 5. Commands
+
+`uv` is installed to the user site and **is not on PATH**:
 
 ```bash
 export PATH="/c/Users/Kanish/AppData/Roaming/Python/Python312/Scripts:$PATH"
 ```
 
 ```bash
-uv sync --group dev                # env
-uv run pytest                      # 15 tests, ~0.2s
-uv run ruff check .                # must be clean; CI lint must never --fix
+uv sync --group dev
+uv run pytest                 # 88 tests, ~1.3s
+uv run ruff check .           # must be clean; CI lint must never --fix
 uv run cartographer resolve --repo . --issue issue.txt --mode graph --k 4
-uv run cartographer modes
+uv run python eval/graph_hit_rate.py \
+    ../_fixtures/swebench_verified.json ../_fixtures --repos requests --quiet
 ```
 
-Green baseline as of Phase 0: **`ruff` clean, 15 passed**.
+Green baseline: **ruff clean, 88 passed.**
+
+Fixtures live in `~/projects/_fixtures` (untracked, outside the repo): full clones of flask,
+requests, pytest, pylint, xarray, plus `swebench_verified.json` — all 500 Verified instances,
+pulled from the HF datasets-server with no auth. ⚠️ The eval **checks those clones out at each
+instance's `base_commit`** and leaves them on a detached head. They are throwaway; don't work in
+them.
 
 ---
 
-## 5. Known hazards and open items
+## 6. Known hazards
 
 - **Docker daemon is not responding.** `docker --version` answers (29.5.3) but `docker info` hangs
-  past 120s — Desktop is installed but the engine isn't up. Phase 2 cannot start until that is
-  fixed. Check before planning any sandbox work.
-- **`uv` is not on PATH** — see §4. A session that forgets this gets `command not found` and may
-  waste time reinstalling.
-- **Git Bash mangles Rich's box-drawing and `·`/`—`** when output is piped (shows as `?`). Cosmetic
-  in a pipe; unverified whether a real Windows terminal renders it correctly. Don't "fix" the CLI
-  over a piped screenshot.
-- **CRLF warnings on every `git add`** — noise on Windows, not a problem.
-- **`pyproject.toml` needs `README.md` to exist** or the hatchling build fails during `uv sync`.
-  Bit me once.
-- Bash heredocs are unreliable for large source files here; write source with the Write tool, or a
-  small Python script doing exact string replacement with an `assert old in s` guard so a missed
-  match is loud.
+  past 120s. Phase 2 cannot start until Desktop is up.
+- **`uv` is not on PATH** — §5. A session that forgets this wastes time reinstalling it.
+- **Bare `python` is 3.14, not the project's 3.12**, and it reads `/tmp/x` as a Windows-relative
+  path. Use `uv run python`, or `/c/Python312/python.exe` for one-off scripts.
+- ⚠️ **Shell heredocs collapse backslash escapes here.** This wrote a regex containing a literal
+  0x08 byte where `\b` was intended: it compiled, read correctly in the source, and could never
+  match. The only symptom was "0 seeds". Write escape-heavy source with the Write tool, or build
+  the string with `chr(92)`. `tests/test_seeds.py` has a regression test; a repo-wide sweep found
+  no other control bytes.
+- **`pyproject.toml` needs `README.md` to exist** or hatchling fails during `uv sync`.
+- Rich's box-drawing renders as `?` through a Git Bash pipe. Cosmetic; unverified in a real
+  terminal. Don't "fix" the CLI over a piped screenshot.
+- CRLF warnings on every `git add` are Windows noise.
 
 ---
 
-## 6. Working agreement in force
+## 7. Working agreement in force
 
-Set by the builder at session start; applies to every session:
-
-1. **Authorship**: every commit is his. No `Co-Authored-By`, no AI attribution anywhere in a
-   message, PR body or comment. Verify with
-   `git log --format='%an <%ae>' | sort -u` and a grep for `co-authored|generated with|claude`.
-2. **Autonomy**: make the call, do the work, report the decision. Don't present menus. The one
-   standing exception is in the kickoff: *show the Phase 1 plan before writing the graph builder.*
-3. **Commits**: one per coherent unit, message matches the staged diff, body explains why. Split a
-   file across two commits rather than writing a vague message.
-4. **Verify against reality**: probe before designing, run the real thing, hit the real dependency.
-   **Mutation-check every suite** — break an assertion and confirm red. This already paid: the
-   first cut of the Phase-0 tests passed with an off-by-one in `Snippet.end_line`, and the
-   span/text consistency assertion was added to close it.
-5. **Honesty**: say plainly what is unverified, and keep saying it. Real numbers, not rounded
-   impressions.
-6. **CI**: lint → typecheck → build → tests, cheapest first. CI lint must not auto-fix. A skipped
-   test under `CI=true` is a hard failure.
-7. **Scope**: finish the whole task; fix real defects found in passing and say so; don't add docs,
-   changelogs or refactors nobody asked for.
+1. **Authorship**: every commit is his. No `Co-Authored-By`, no AI attribution anywhere. Verify:
+   `git log --format='%an <%ae>' | sort -u` and grep for `co-authored|generated with|claude`.
+2. **Autonomy**: make the call, do the work, report the decision. The one standing exception is in
+   the kickoff: *show the Phase 1 plan before writing the graph builder* (done).
+3. **Commits**: one per coherent unit; message matches the staged diff; body explains why.
+4. **Verify against reality**: probe before designing, run the real thing. **Mutation-check every
+   suite.** This has paid four times now — see §8.
+5. **Honesty**: say what is unverified and keep saying it. Real numbers.
+6. **CI**: lint → typecheck → build → tests. CI lint must not auto-fix. A skipped test under
+   `CI=true` is a hard failure.
+7. **Scope**: finish the whole task; fix real defects found in passing and say so.
 
 ---
 
-## 7. Picking up: Phase 1
+## 8. What mutation testing has caught so far
 
-Plan is in §"Phase 1" of the session log / restated here in short — build in this order:
+Kept because it is the strongest argument for continuing to do it:
 
-1. `graph/python_analyzer.py` on stdlib `ast` (behind `LanguageAnalyzer`, so tree-sitter can
-   replace it), returning `FileAnalysis` and never raising on a syntax error.
-2. `graph/graph_builder.py`: module resolution (absolute + relative), symbol table, then
-   `networkx.DiGraph` with `imports` / `calls` / `inherits` edges. Own the fact that call
-   resolution is *heuristic* in Python and record confidence on the edge rather than pretending.
-3. `graph/blast_radius.py`: seeds → ranked subgraph. Reverse-reachability (who calls the seed)
-   weighted by distance and fan-in, the Arch Lens instability idea reused.
-4. `retrieval/graph_retriever.py`: seed extraction from issue text, then rank → `Snippet`s under a
-   token budget. Delete `retrieval/stub.py` when the embedding retriever also lands.
-5. Validate on a real mid-size Python OSS repo with a *known* past fix: does the true fix location
-   appear in the top-k? Write that up as the README worked example. **This validation is the point
-   of Phase 1** — an unvalidated graph is a plausible-looking artifact, not a moat.
+- An off-by-one in `Snippet.end_line` — all 15 Phase-0 tests passed with it.
+- Both re-export tests passed with **re-export resolution disabled**: the short-name fallback
+  reached the same node by a weaker route. They assert `via` and confidence now, not just the node.
+- The decay test held with decay switched off (degree-splitting alone explained the result).
+- Seed pinning held only because the seed happened to score highest.
+
+Two of my own mutations were also invalid (`set() or {...}` is a no-op; a test filtered
+`pkg/util.py` as if it were `pkg/u<N>.py`). When a mutation survives, check the mutation before
+trusting the test.
+
+---
+
+## 9. Next actions, in order
+
+1. **Close the small-k gap** — the headline weakness. Two concrete leads: pylint-style issues that
+   seed nothing (parse command-line output and error codes), and re-ranking so a
+   high-confidence-only subgraph decides the top 3.
+2. **Run the `min_confidence` ablation.** The plumbing exists and is tested but has never been
+   swept. It answers "does the guessed half of the graph help or hurt?" with a number — that is a
+   README-grade finding either way.
+3. **README worked example** — Phase 1 is not closed without it (kickoff §Phase 1).
+4. Widen the eval to django/sympy for a larger n before drawing conclusions from 59 instances.
+5. Then Phase 2, once Docker is up.
