@@ -19,6 +19,7 @@ to handle honestly.
 from __future__ import annotations
 
 import ast
+import warnings
 
 from .analyzer_base import BaseRef, CallRef, FileAnalysis, ImportRef, SymbolDef, SymbolKind
 
@@ -176,7 +177,13 @@ class PythonAnalyzer:
 
     def analyze(self, path: str, source: str) -> FileAnalysis:
         try:
-            tree = ast.parse(source)
+            with warnings.catch_warnings():
+                # Scanning historical checkouts is the normal case here, and old
+                # code raises SyntaxWarning for things that were legal when it
+                # was written (`\*` in a docstring, `is` against a literal).
+                # They are not our diagnostics and they drown real output.
+                warnings.simplefilter("ignore")
+                tree = ast.parse(source)
         except (SyntaxError, ValueError) as exc:
             # Never raise: one unparseable file must not abort a repo scan. Real
             # checkouts contain Python 2 files, templates and test fixtures that
