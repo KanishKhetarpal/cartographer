@@ -1,0 +1,21 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# secrets
+.env
+.env.*
+
+# eval scratch: results/ IS committed (it is the deliverable); its scratch is not
+results/**/raw_trajectories/
+eval/.cache/
