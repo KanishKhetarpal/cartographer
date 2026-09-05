@@ -26,19 +26,52 @@ If the graph does not beat the baseline, that is a finding and it gets reported 
 
 ## Status
 
-**Phase 0 — scaffold.** Interfaces and CLI wiring are real and tested. Both retrievers are
-placeholders that flag themselves (`Context.stats["stub"] is True`) so a Phase-0 run can never be
-mistaken for a result. No model is called yet.
+**Phase 1 — the graph engine is real.** A repo is parsed into a symbol graph with import, call and
+inheritance edges; an issue is seeded lexically and expanded into a ranked blast radius. No model is
+called yet: the agent loop still emits a placeholder patch, and `Result.stub` says so.
 
 | Phase | | |
 |---|---|---|
 | 0 | Scaffold: interfaces, stub CLI, tests | ✅ |
-| 1 | Code graph engine (Python analyzer, blast radius) | in progress |
+| 1 | Code graph engine (Python analyzer, resolver, blast radius) | core ✅ |
 | 2 | Docker sandbox + SWE-bench harness wiring | |
 | 3 | LangGraph agent loop | |
 | 4 | Embedding baseline + the ≥50-task comparison | |
 | 5 | README polish, CI, architecture diagram | |
 | 6 | Stretch: MCP server | |
+
+### Where the graph stands today
+
+Validated against **59 SWE-bench Verified instances** (requests, pytest, pylint, xarray) by checking
+each repo out at its `base_commit`, seeding from the issue text alone, and asking whether the gold
+patch's files land in the top *k*. The control is lexical seed extraction with no graph traversal —
+because an issue that names a file has already told you the answer, and a retriever has to beat that
+to have earned anything.
+
+| k | graph | seeds only |
+|---|---|---|
+| 1 | 0.280 | 0.280 |
+| 3 | 0.412 | 0.412 |
+| 5 | 0.531 | 0.523 |
+| 10 | 0.582 | 0.557 |
+| 20 | **0.740** | 0.557 |
+
+**The graph is worth +18 points of file recall at k=20 and roughly nothing below k=5.** Since the
+thesis is about *tight* context, that is a weaker result than the pitch wants, and it is reported
+rather than rounded off. Closing the small-k gap is the most valuable open work here.
+
+Reproduce with `uv run python eval/graph_hit_rate.py <swebench.json> <repo-dir> --repos requests`;
+raw rows in [`results/phase1_hitrate.json`](results/phase1_hitrate.json).
+
+### Why call edges carry a confidence
+
+Python call resolution is undecidable without type inference, so the graph records how it earned
+each edge instead of pretending. Measured over flask's 3963 call sites, only ~10% are a bare name
+bound by an import or a local def, and a third of receivers are local variables no name-based scheme
+can resolve. Edges are tiered `direct` / `attribute` / `self_mro` / `unique_name` / `ambiguous`, and
+above three candidates **no edge is emitted at all** — `get` alone is called at 385 sites in flask,
+and noise in a blast radius is worse than a missing edge, because it silently spends the token
+budget on the wrong files.
 
 ## Quickstart
 
