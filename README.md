@@ -92,70 +92,59 @@ the discipline the whole project is about.
 Regenerate with
 `uv run python eval/worked_example.py <swebench.json> <repo-dir> pytest-dev__pytest-7236`.
 
-### The guessed half of the call graph is not paying for itself
+### Does the guessed half of the call graph pay for itself? Not settled — and that is the result
 
-Half of Python call edges are earned by a repo-wide name match rather than by resolution.
-`min_confidence` drops them without rebuilding, so the question gets a number
-([`results/phase1_ablation.json`](results/phase1_ablation.json), same 59 instances):
+Half of Python call edges are earned by a repo-wide name match rather than by resolution, so
+`min_confidence` drops them without rebuilding and the question gets a number. It got two, and they
+disagree.
+
+**Four small repos** (requests, pytest, pylint, xarray; n=59) — dropping every guessed edge *helps*:
 
 | config | @5 | @10 | @20 |
 |---|---|---|---|
 | all edges | 0.616 | 0.684 | **0.774** |
-| drop `ambiguous` (0.25) | 0.616 | 0.701 | 0.766 |
 | drop all guesses (≥0.60) | 0.616 | **0.709** | 0.766 |
-| import-resolved only (≥0.86) | 0.616 | 0.709 | 0.766 |
-| 1 hop | 0.607 | 0.684 | 0.715 |
-| 2 hops | 0.616 | 0.684 | 0.740 |
-| 4 hops | 0.616 | 0.684 | 0.782 |
 
-Guessed edges **cost** 2.5 points at k=10 and buy 0.8 at k=20 — they add reach and dilute precision,
-and at tight k the dilution wins. ⚠️ On n=59 one instance is worth 1.7 points, so that difference is
-about 1.5 instances: suggestive, not settled, and the default is unchanged until it is re-run with
-more power. Walking further saturates by 3 hops.
+**Two large repos** (django, sympy; n=60) — it does not:
 
-### Why call edges carry a confidence
+| config | @5 | @10 | @20 |
+|---|---|---|---|
+| all edges | **0.674** | **0.733** | **0.776** |
+| drop `ambiguous` (0.25) | 0.658 | 0.733 | 0.776 |
+| drop all guesses (≥0.60) | 0.658 | 0.733 | 0.768 |
+| import-resolved only (≥0.86) | 0.674 | 0.716 | 0.749 |
+| 1 hop | 0.658 | 0.716 | 0.743 |
+| 2 hops | 0.674 | 0.733 | 0.776 |
+| 4 hops | 0.674 | 0.733 | 0.776 |
 
-Python call resolution is undecidable without type inference, so the graph records how it earned
-each edge instead of pretending. Measured over flask's 3963 call sites, only ~10% are a bare name
-bound by an import or a local def, and a third of receivers are local variables no name-based scheme
-can resolve. Edges are tiered `direct` / `attribute` / `self_mro` / `unique_name` / `ambiguous`, and
-above three candidates **no edge is emitted at all** — `get` alone is called at 385 sites in flask,
-and noise in a blast radius is worse than a missing edge, because it silently spends the token
-budget on the wrong files.
+**The 2.5-point gain at k=10 did not replicate.** At n≈60 one instance is worth ~1.7 points, so the
+original finding was about 1.5 instances of noise, and the default was deliberately left alone
+pending exactly this check. Keeping the guessed edges is now an evidenced decision rather than an
+unexamined one.
 
-## Quickstart
+What *does* hold on both sets: **one hop is not enough and three is not better than two**, and
+`imports-only` — which also discards `self.method()` resolution through the MRO — is worse than
+baseline on the large repos at every k above 5.
 
-```bash
-uv sync --group dev
-uv run cartographer resolve --repo /path/to/checkout --issue issue.txt --mode graph
-uv run pytest
-```
+Per-repo, graph vs. the no-graph control at k=20 — including the one it does badly on:
 
-`--issue` takes either plain text (first non-empty line is the title) or a JSON object with
-`problem_statement` — the shape SWE-bench hands out.
+| repo | n | graph | seeds only |
+|---|---|---|---|
+| pydata/xarray | 22 | 1.000 | 0.886 |
+| psf/requests | 8 | 0.875 | 0.625 |
+| sympy/sympy | 30 | 0.833 | 0.796 |
+| pytest-dev/pytest | 19 | 0.737 | 0.553 |
+| django/django | 30 | 0.719 | 0.603 |
+| **pylint-dev/pylint** | 10 | **0.267** | 0.233 |
 
-## Architecture
+⚠️ **pylint is a near-total failure, and the cause is upstream of the graph.** Its issues quote CLI
+flags and message codes (`--ignore-paths`, `W0611`) instead of naming code, so seed extraction
+starves: **median 2 seeds per issue, against xarray's 9.** The split is total — all seven pylint
+instances with ≤3 seeds scored 0.00 at every k, and all three with ≥8 seeds scored 0.67 to 1.00.
+A graph cannot rank what it was never pointed at, so the next gain there is in seeding, not in
+traversal.
 
-```
-                ┌─────────────────────────────────────────────┐
-   GitHub       │                 ORCHESTRATOR                 │
-   issue  ─────▶│         (LangGraph state machine)            │
-                │  plan → retrieve → edit → test → reflect ↺   │
-                └───────┬───────────────┬───────────────┬──────┘
-                        │               │               │
-                ┌───────▼──────┐ ┌──────▼───────┐ ┌─────▼────────┐
-                │  RETRIEVER   │ │  CODE EDITOR │ │   SANDBOX    │
-                │ graph | embed│ │ apply patch  │ │ Docker: run  │
-                │ (pluggable)  │ │ + validate   │ │ repo tests   │
-                └───────┬──────┘ └──────────────┘ └──────────────┘
-                        │
-                ┌───────▼───────────────────────────────────────┐
-                │        CODE GRAPH ENGINE (the moat)           │
-                │  parse → symbol table →                       │
-                │  import + call + inheritance graph →          │
-                │  blast-radius ranking (fan-in/out, distance)  │
-                └───────────────────────────────────────────────┘
-```
+Raw rows in [`results/`](results/), rendered by `uv run python eval/report.py`.
 
 ### ...and what is actually wired, drawn by Cartographer itself
 
