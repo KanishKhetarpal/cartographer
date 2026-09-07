@@ -25,6 +25,12 @@ _TRACEBACK = re.compile(r'File "([^"]+\.py)", line (\d+)(?:, in (\w+))?')
 #: prose does not read as a path.
 _PATH = re.compile(r"\b((?:[\w.-]+/)*[\w.-]+\.py)\b")
 
+#: A GitHub blob permalink, which names a file and often the exact line:
+#: `https://github.com/org/repo/blob/<sha>/pkg/mod.py#L99`. Bug reports written
+#: by maintainers link these constantly, and the line they point at is usually
+#: the line they think is wrong -- nearly as strong a signal as a traceback.
+_BLOB_URL = re.compile(r"https?://\S*?/blob/[^\s/]+/(\S+?\.py)(?:#L(\d+))?")
+
 #: Identifiers worth seeding on. Bare lowercase words are excluded by the
 #: stoplist below rather than by the pattern, so `save`/`load` still qualify.
 _IDENT = re.compile(r"\b([A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*)\b")
@@ -113,20 +119,39 @@ def extract_paths(text: str) -> list[str]:
     return sorted(seen, key=len, reverse=True)
 
 
-def seed_files(text: str, cg: CodeGraph) -> list[str]:
-    """The files the issue names, matched by path suffix.
+def match_path(mentioned: str, known: list[str]) -> list[str]:
+    """Repo paths a mentioned path refers to, longest suffix first.
 
-    An issue writes `sklearn/linear_model/base.py` or just `base.py`; both must
-    match, and neither may match a file that merely ends with the same
-    characters mid-segment.
+    Leading segments are trimmed one at a time because a mentioned path is
+    frequently prefixed with something the repo does not contain -- a GitHub
+    blob URL carries `github.com/org/repo/blob/<sha>/` in front of the part that
+    matters, and a plain suffix comparison finds nothing at all. That was
+    costing real instances: an issue linking the exact line of the exact gold
+    file scored zero.
+
+    A bare basename (`base.py`) is only accepted when it is unambiguous. Django
+    has dozens of `models.py`, and nominating an arbitrary one is worse than
+    nominating none.
     """
+    parts = [p for p in mentioned.strip("./").split("/") if p]
+    for i in range(len(parts)):
+        cand = "/".join(parts[i:])
+        hits = [p for p in known if p == cand or p.endswith("/" + cand)]
+        if not hits:
+            continue
+        if len(parts) - i == 1 and len(hits) > 1:
+            return []
+        return hits
+    return []
+
+
+def seed_files(text: str, cg: CodeGraph) -> list[str]:
+    """The files the issue names, matched by path suffix."""
     known = list(cg.paths)
     out: dict[str, None] = {}
     for mentioned in extract_paths(text):
-        m = mentioned.lstrip("./")
-        for path in known:
-            if path == m or path.endswith("/" + m):
-                out.setdefault(path, None)
+        for path in match_path(mentioned, known):
+            out.setdefault(path, None)
     return list(out)
 
 
@@ -149,14 +174,29 @@ def extract_seeds(text: str, cg: CodeGraph, *, max_seeds: int = 40) -> list[Seed
         if prev is None or weight > prev.weight:
             seeds[node] = Seed(node=node, weight=weight, evidence=evidence)
 
+    known = list(cg.paths)
+
     # 1. Traceback frames: file + line -> the innermost symbol on that line.
     for m in _TRACEBACK.finditer(text):
-        mentioned, line = m.group(1).lstrip("./"), int(m.group(2))
-        for path in cg.paths:
-            if path == mentioned or path.endswith("/" + mentioned):
-                node = cg.node_for_line(path, line)
+        mentioned, line = m.group(1), int(m.group(2))
+        for path in match_path(mentioned, known):
+            node = cg.node_for_line(path, line)
+            if node:
+                offer(node, 4.0, f"traceback {mentioned}:{line}")
+
+    # 1b. A linked blob permalink is the maintainer pointing at the line they
+    #     believe is wrong. Weighted just under a traceback frame.
+    for m in _BLOB_URL.finditer(text):
+        mentioned, lineno = m.group(1), m.group(2)
+        for path in match_path(mentioned, known):
+            if lineno:
+                node = cg.node_for_line(path, int(lineno))
                 if node:
-                    offer(node, 4.0, f"traceback {mentioned}:{line}")
+                    offer(node, 3.5, f"permalink {mentioned}#L{lineno}")
+            else:
+                mod = node_id(path, MODULE_SYMBOL)
+                if mod in g:
+                    offer(mod, 1.6, f"permalink {mentioned}")
 
     # 2. Files the issue names -> their module node, so that a file mentioned
     #    with no symbol still puts its neighbourhood in play.

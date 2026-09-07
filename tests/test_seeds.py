@@ -99,3 +99,40 @@ def test_the_call_pattern_is_a_word_boundary_not_a_control_character(seedrepo):
     backslash = chr(92)
     assert backslash + 'b' in seeds_mod._CALLED.pattern
     assert not any(ord(c) < 32 for c in seeds_mod._CALLED.pattern)
+
+
+def test_a_github_permalink_seeds_the_file_and_the_line(seedrepo):
+    """Maintainer bug reports link blob permalinks constantly. The URL prefix
+    used to defeat the suffix match entirely, so an issue naming the exact line
+    of the exact gold file scored zero."""
+    url = "https://github.com/org/proj/blob/ce7cccf9645/pkg/models.py#L3"
+    seeds = extract_seeds(f"This is the line where it breaks.\n{url}\n", seedrepo)
+    assert seeds
+    assert seeds[0].node == node_id("pkg/models.py", "Response.json")
+    assert "permalink" in seeds[0].evidence
+
+
+def test_a_permalink_without_a_line_still_seeds_the_file(seedrepo):
+    url = "https://github.com/org/proj/blob/abc123/pkg/other.py"
+    assert seed_files(url, seedrepo) == ["pkg/other.py"]
+
+
+def test_a_url_prefixed_path_is_matched_by_trimming_leading_segments(seedrepo):
+    from cartographer.retrieval.seeds import match_path
+
+    known = list(seedrepo.paths)
+    assert match_path("github.com/org/proj/blob/abc/pkg/models.py", known) == ["pkg/models.py"]
+    assert match_path("pkg/models.py", known) == ["pkg/models.py"]
+
+
+def test_an_ambiguous_bare_basename_nominates_nothing(tmp_path):
+    """Django has dozens of models.py. Picking an arbitrary one is worse than
+    picking none, so a single-segment match must be unique to count."""
+    from cartographer.retrieval.seeds import match_path
+
+    cg = build_graph(
+        write(tmp_path, {"a/models.py": "x = 1\n", "b/models.py": "y = 2\n"})
+    )
+    known = list(cg.paths)
+    assert match_path("models.py", known) == []
+    assert match_path("a/models.py", known) == ["a/models.py"]
