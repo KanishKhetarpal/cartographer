@@ -271,3 +271,24 @@ def test_a_null_byte_is_reported_not_raised():
 def test_an_empty_file_analyzes_clean():
     fa = PythonAnalyzer().analyze("empty.py", "")
     assert fa.ok and fa.symbols == ()
+
+
+def test_an_ast_too_deep_to_walk_is_reported_not_raised():
+    """`ast.parse` handles expressions a NodeVisitor cannot, so the walk needs
+    its own guard. Found on sympy, whose resolvent_lookup.py is 40KB of nested
+    polynomial literals -- without this, one file aborts the whole repo scan,
+    which is precisely what this class promises never to do."""
+    src = "x = " + "+".join(["1"] * 500) + "\n"
+    import ast
+
+    ast.parse(src)  # the parser is fine with it; the visitor is not
+    fa = PythonAnalyzer().analyze("deep.py", src)
+    assert not fa.ok
+    assert "RecursionError" in fa.errors[0] and "walk" not in fa.errors[0]
+    assert fa.symbols == ()
+
+
+def test_an_expression_too_deep_to_parse_is_reported_separately():
+    src = "x = " + "+".join(["1"] * 4000) + "\n"
+    fa = PythonAnalyzer().analyze("deeper.py", src)
+    assert not fa.ok and "RecursionError" in fa.errors[0]

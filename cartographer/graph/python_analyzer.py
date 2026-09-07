@@ -193,8 +193,17 @@ class PythonAnalyzer:
             return FileAnalysis(path=path, errors=("RecursionError: expression too deeply nested",))
 
         c = _Collector(path)
-        for stmt in tree.body:
-            c.visit(stmt)
+        try:
+            for stmt in tree.body:
+                c.visit(stmt)
+        except RecursionError:
+            # Parsing succeeded but walking did not: `ast.parse` is iterative
+            # enough to handle expressions that a NodeVisitor cannot. Real code
+            # does this -- sympy/polys/numberfields/resolvent_lookup.py is 40KB
+            # of nested polynomial literals -- and without this the whole repo
+            # scan dies on one file, which is exactly what this class promises
+            # never to do.
+            return FileAnalysis(path=path, errors=("RecursionError: AST too deeply nested",))
         return FileAnalysis(
             path=path,
             symbols=tuple(c.symbols),
