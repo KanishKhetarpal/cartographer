@@ -5,26 +5,31 @@ budget.
 
 ## Why the issue's own file mentions are pinned in front
 
-Measured over 59 SWE-bench Verified instances (requests, pytest, pylint,
-xarray), file-level recall:
-
-    k     graph-only   union   seeds-only
-    1        0.237     0.288     0.288
-    3        0.421     0.438     0.438
-    5        0.506     0.523     0.514
-    10       0.582     0.582     0.556
-    20       0.740     0.740     0.556
-
-Ranking purely by graph score was *worse than its own seeds* at small k: an
+Ranking purely by graph score was *worse than its own seeds* at small k. An
 issue that names `sklearn/linear_model/base.py` has told us the answer, and a
-symbol-level score can dilute that behind neighbours it inferred. So the order
-is evidence-first -- files the issue literally names, then everything the graph
-inferred. The union is >= both at every k, which is the property that matters:
-the retriever must never do worse than the regex it is built on top of.
+symbol-level score dilutes that behind neighbours it inferred. Measured at the
+time on 59 SWE-bench Verified instances (2026-09-06, before the path-matching
+fix), file recall at k=1 was 0.237 ranking by score against 0.288 for the seeds
+alone; the union of the two was >= both at every k.
 
-The win is real but concentrated at wide k (+18 points at 20 vs seeds alone).
-That is a weaker claim than the thesis wants and it is recorded here rather
-than rounded off; closing the gap at small k is open work.
+So the order is evidence-first -- files the issue literally names, then
+everything the graph inferred. **The property to preserve is that the retriever
+never does worse than the regex it is built on top of**, not those particular
+numbers.
+
+Current standing, same 59 instances (`results/phase1_hitrate.json`):
+
+    k        graph   seeds-only
+    1        0.356     0.356
+    3        0.557     0.557
+    5        0.616     0.599
+    10       0.684     0.633
+    20       0.774     0.633
+
+The graph contributes nothing at k<=3, where the issue's own text is already
+the whole answer, and +5 to +14 points from k=5 out. That is a weaker claim
+than a thesis about tight context wants, and it is recorded rather than rounded
+off.
 """
 
 from __future__ import annotations
