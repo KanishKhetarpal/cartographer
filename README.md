@@ -50,18 +50,68 @@ to have earned anything.
 
 | k | graph | seeds only |
 |---|---|---|
-| 1 | 0.280 | 0.280 |
-| 3 | 0.412 | 0.412 |
-| 5 | 0.531 | 0.523 |
-| 10 | 0.582 | 0.557 |
-| 20 | **0.740** | 0.557 |
+| 1 | 0.356 | 0.356 |
+| 3 | 0.557 | 0.557 |
+| 5 | 0.616 | 0.599 |
+| 10 | **0.684** | 0.633 |
+| 20 | **0.774** | 0.633 |
 
-**The graph is worth +18 points of file recall at k=20 and roughly nothing below k=5.** Since the
-thesis is about *tight* context, that is a weaker result than the pitch wants, and it is reported
-rather than rounded off. Closing the small-k gap is the most valuable open work here.
+**The graph contributes nothing at k≤3 and +5 to +14 points from k=5 out.** Below k=3 the issue's
+own text is already the whole answer. That is a weaker claim than a thesis about tight context
+wants, and it is reported rather than rounded off.
 
 Reproduce with `uv run python eval/graph_hit_rate.py <swebench.json> <repo-dir> --repos requests`;
 raw rows in [`results/phase1_hitrate.json`](results/phase1_hitrate.json).
+
+### Worked example: a file the issue never mentions
+
+`pytest-dev__pytest-7236`. The issue names **no file at all**, so lexical retrieval has nothing to
+go on and scores 0.00 at every k. The graph reaches the gold file at rank 9 of 217:
+
+```
+## Seeds extracted (6)
+   1.50  src/_pytest/outcomes.py::skip              mentions unittest.skip
+   1.50  src/_pytest/debugging.py::post_mortem      mentions post_mortem
+   ...
+
+## Ranked files (top 10 of 217)
+   1.      src/_pytest/debugging.py     seed
+   2.      src/_pytest/outcomes.py      seed
+   ...
+   8.      src/_pytest/skipping.py      calls from src/_pytest/outcomes.py:skip @1
+   9. GOLD src/_pytest/unittest.py      calls from src/_pytest/outcomes.py:skip @1
+
+recall@10 = 1.00
+context: 10 snippets, ~604 tokens
+```
+
+The issue says `unittest.skip`; `skip` resolves to `outcomes.py::skip`; the file that a correct fix
+touches is one call edge away from it. **604 tokens of context out of a 217-file repo** — which is
+the discipline the whole project is about.
+
+Regenerate with
+`uv run python eval/worked_example.py <swebench.json> <repo-dir> pytest-dev__pytest-7236`.
+
+### The guessed half of the call graph is not paying for itself
+
+Half of Python call edges are earned by a repo-wide name match rather than by resolution.
+`min_confidence` drops them without rebuilding, so the question gets a number
+([`results/phase1_ablation.json`](results/phase1_ablation.json), same 59 instances):
+
+| config | @5 | @10 | @20 |
+|---|---|---|---|
+| all edges | 0.616 | 0.684 | **0.774** |
+| drop `ambiguous` (0.25) | 0.616 | 0.701 | 0.766 |
+| drop all guesses (≥0.60) | 0.616 | **0.709** | 0.766 |
+| import-resolved only (≥0.86) | 0.616 | 0.709 | 0.766 |
+| 1 hop | 0.607 | 0.684 | 0.715 |
+| 2 hops | 0.616 | 0.684 | 0.740 |
+| 4 hops | 0.616 | 0.684 | 0.782 |
+
+Guessed edges **cost** 2.5 points at k=10 and buy 0.8 at k=20 — they add reach and dilute precision,
+and at tight k the dilution wins. ⚠️ On n=59 one instance is worth 1.7 points, so that difference is
+about 1.5 instances: suggestive, not settled, and the default is unchanged until it is re-run with
+more power. Walking further saturates by 3 hops.
 
 ### Why call edges carry a confidence
 
