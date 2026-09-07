@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cartographer.graph.graph_builder import build_graph  # noqa: E402
 from cartographer.retrieval.base import Issue  # noqa: E402
 from cartographer.retrieval.graph_retriever import GraphRetriever  # noqa: E402
+from cartographer.retrieval.seeds import extract_seeds, seed_files  # noqa: E402
 from eval.graph_hit_rate import (  # noqa: E402
     K_VALUES,
     FixtureLock,
@@ -54,8 +55,16 @@ CONFIGS: tuple[tuple[str, float, int], ...] = (
 )
 
 
-def run(instances, repo_dir: Path, configs, verbose: bool):
-    totals = {label: dict.fromkeys(K_VALUES, 0.0) for label, _, _ in configs}
+#: The no-graph control, swept alongside the configurations so that one pass
+#: over the instances yields both the headline comparison and the sweep. Graph
+#: construction dominates the cost (36s for django), so running the two
+#: harnesses separately would double the expensive half for no new information.
+SEEDS_ONLY = "seeds-only (no graph)"
+
+
+def run(instances, repo_dir: Path, configs, verbose: bool, per_repo: dict[str, list] | None = None):
+    labels = [SEEDS_ONLY, *(label for label, _, _ in configs)]
+    totals = {label: dict.fromkeys(K_VALUES, 0.0) for label in labels}
     counted = 0
     for inst in instances:
         repo = repo_dir / inst["repo"].split("/")[-1]
@@ -63,14 +72,40 @@ def run(instances, repo_dir: Path, configs, verbose: bool):
         if not gold or not repo.exists() or not checkout(repo, inst["base_commit"]):
             continue
         cg = build_graph(repo)
-        issue = Issue(id=inst["instance_id"], title="", body=inst["problem_statement"])
+        text = inst["problem_statement"]
+        issue = Issue(id=inst["instance_id"], title="", body=text)
+
+        seeds = extract_seeds(text, cg)
+        control: dict[str, None] = {}
+        for p in seed_files(text, cg):
+            control.setdefault(p, None)
+        for s in sorted(seeds, key=lambda s: -s.weight):
+            control.setdefault(cg.g.nodes[s.node]["path"], None)
+        per_instance = {SEEDS_ONLY: list(control)}
+
         for label, conf, hops in configs:
             order, _ = GraphRetriever(
                 max_hops=hops, min_confidence=conf, graph=cg
             ).rank(issue, cg)
-            files = rank_files(cg, order, max(K_VALUES))
+            per_instance[label] = rank_files(cg, order, max(K_VALUES))
+
+        for label, files in per_instance.items():
             for k in K_VALUES:
                 totals[label][k] += len(gold & set(files[:k])) / len(gold)
+        if per_repo is not None:
+            per_repo.setdefault(inst["repo"], []).append(
+                {
+                    "id": inst["instance_id"],
+                    "gold": len(gold),
+                    "files": cg.stats["files"],
+                    "build_s": cg.stats["build_seconds"],
+                    **{
+                        f"{label}@{k}": len(gold & set(files[:k])) / len(gold)
+                        for label, files in per_instance.items()
+                        for k in K_VALUES
+                    },
+                }
+            )
         counted += 1
         if verbose and counted % 10 == 0:
             print(f"  {counted} instances", flush=True)
@@ -83,6 +118,8 @@ def main() -> None:
     ap.add_argument("repo_dir")
     ap.add_argument("--repos", default="")
     ap.add_argument("--out", default="")
+    ap.add_argument("--max-per-repo", type=int, default=0,
+                    help="Cap instances per repo. django alone is 231 x 36s.")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
@@ -90,9 +127,22 @@ def main() -> None:
     wanted = {r.strip() for r in args.repos.split(",") if r.strip()}
     if wanted:
         data = [d for d in data if d["repo"].split("/")[-1] in wanted]
+    if args.max_per_repo:
+        # Deterministic: the dataset order, truncated. Not sampled, so a rerun
+        # scores the same instances.
+        seen: dict[str, int] = {}
+        capped = []
+        for d in data:
+            n_seen = seen.get(d["repo"], 0)
+            if n_seen < args.max_per_repo:
+                capped.append(d)
+                seen[d["repo"]] = n_seen + 1
+        data = capped
 
+    per_repo: dict[str, list] = {}
     with FixtureLock(Path(args.repo_dir)):
-        totals, n = run(data, Path(args.repo_dir), CONFIGS, verbose=not args.quiet)
+        totals, n = run(data, Path(args.repo_dir), CONFIGS,
+                        verbose=not args.quiet, per_repo=per_repo)
     if not n:
         print("no instances evaluated")
         return
@@ -100,14 +150,23 @@ def main() -> None:
     header = f"{'config':<26}" + "".join(f"{'@' + str(k):>8}" for k in K_VALUES)
     print(f"\nn={n}\n{header}")
     rows = {}
-    for label, _, _ in CONFIGS:
+    for label in [SEEDS_ONLY, *(c[0] for c in CONFIGS)]:
         vals = {k: totals[label][k] / n for k in K_VALUES}
         rows[label] = vals
         print(f"{label:<26}" + "".join(f"{vals[k]:>8.3f}" for k in K_VALUES))
 
     if args.out:
         Path(args.out).write_text(
-            json.dumps({"n": n, "configs": [c[0] for c in CONFIGS], "recall": rows}, indent=1),
+            json.dumps(
+                {
+                    "n": n,
+                    "repos": {k: len(v) for k, v in per_repo.items()},
+                    "configs": [SEEDS_ONLY, *(c[0] for c in CONFIGS)],
+                    "recall": rows,
+                    "rows": per_repo,
+                },
+                indent=1,
+            ),
             encoding="utf-8",
         )
 
