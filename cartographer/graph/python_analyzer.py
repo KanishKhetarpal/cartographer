@@ -23,7 +23,7 @@ import warnings
 
 from .analyzer_base import BaseRef, CallRef, FileAnalysis, ImportRef, SymbolDef, SymbolKind
 
-_DEF_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+_DefNode = ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
 
 
 def decorator_name(node: ast.expr) -> str | None:
@@ -81,21 +81,21 @@ class _Collector(ast.NodeVisitor):
                 return ".".join(name for name, _ in self._scope[: i + 1])
         return None
 
-    def _span(self, node: ast.AST) -> tuple[int, int]:
+    def _span(self, node: _DefNode) -> tuple[int, int]:
         """Line span including decorators.
 
         A decorator is part of what the symbol *is* -- `@app.route("/x")` is
         often the most informative line in a Flask view -- and a snippet that
         starts at `def` silently drops it.
         """
-        start = node.lineno  # type: ignore[attr-defined]
-        for dec in getattr(node, "decorator_list", ()):
+        start = node.lineno
+        for dec in node.decorator_list:
             start = min(start, dec.lineno)
-        return start, getattr(node, "end_lineno", None) or node.lineno  # type: ignore[attr-defined]
+        return start, node.end_lineno or node.lineno
 
     # -- definitions -----------------------------------------------------
-    def _visit_def(self, node: ast.AST, kind: SymbolKind) -> None:
-        name: str = node.name  # type: ignore[attr-defined]
+    def _visit_def(self, node: _DefNode, kind: SymbolKind) -> None:
+        name = node.name
         parent = self._qual_prefix or None
         qualname = f"{parent}.{name}" if parent else name
         start, end = self._span(node)
@@ -109,7 +109,7 @@ class _Collector(ast.NodeVisitor):
                 parent=parent,
                 decorators=tuple(
                     d
-                    for d in (decorator_name(x) for x in getattr(node, "decorator_list", ()))
+                    for d in (decorator_name(x) for x in node.decorator_list)
                     if d
                 ),
             )
@@ -123,7 +123,7 @@ class _Collector(ast.NodeVisitor):
         # Decorators are evaluated in the *enclosing* scope, so they are visited
         # before the scope is pushed -- otherwise `@foo` on a method is recorded
         # as a call made by the method it decorates.
-        for dec in getattr(node, "decorator_list", ()):
+        for dec in node.decorator_list:
             self.visit(dec)
 
         self._scope.append((name, kind))
@@ -172,8 +172,8 @@ class _Collector(ast.NodeVisitor):
 
 
 class PythonAnalyzer:
-    language = "python"
-    extensions = (".py", ".pyi")
+    language: str = "python"
+    extensions: tuple[str, ...] = (".py", ".pyi")
 
     def analyze(self, path: str, source: str) -> FileAnalysis:
         try:

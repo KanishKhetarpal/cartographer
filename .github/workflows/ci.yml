@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync
+        run: uv sync --group dev
+
+      # Cheapest first, so a formatting slip fails in seconds rather than after
+      # the suite. `ruff check` never fixes: a --fix in CI repairs the working
+      # copy and then reports success on code that never satisfied the rules.
+      - name: Lint
+        run: uv run ruff check --no-fix .
+
+      - name: Typecheck
+        run: uv run --with mypy mypy cartographer --ignore-missing-imports
+
+      - name: Build
+        run: uv build
+
+      - name: Tests
+        env:
+          CI: "true"
+        run: uv run pytest --junitxml=report.xml --durations=5
+
+      # A green check with no tests is not a pass, and neither is a green check
+      # over a suite that skipped itself because a dependency was unreachable.
+      # Skipping is right on a laptop; on a build server it means the pipeline
+      # is vouching for tests that never ran. Read from the junit report of the
+      # run that just happened, not from a second collection pass.
+      - name: Assert the suite actually ran
+        if: always()
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          s = ET.parse("report.xml").getroot()
+          s = s.find("testsuite") if s.tag == "testsuites" else s
+          n, sk = int(s.get("tests", 0)), int(s.get("skipped", 0))
+          err = int(s.get("errors", 0)) + int(s.get("failures", 0))
+          print(f"tests={n} skipped={sk} failures+errors={err}")
+          if n < 80:
+              sys.exit(f"::error::expected >=80 tests, ran {n}")
+          if sk:
+              sys.exit(f"::error::{sk} test(s) skipped under CI=true")
+          PY

@@ -19,3 +19,4 @@ htmlcov/
 # eval scratch: results/ IS committed (it is the deliverable); its scratch is not
 results/**/raw_trajectories/
 eval/.cache/
+report.xml
