@@ -157,6 +157,66 @@ uv run pytest
                 └───────────────────────────────────────────────┘
 ```
 
+### ...and what is actually wired, drawn by Cartographer itself
+
+`uv run cartographer graph --repo . --exclude tests,eval` — the import graph of this repo,
+rendered from the same `CodeGraph` the retriever ranks over. The diagram above is the plan;
+this one cannot drift from the code, because it is read out of it.
+
+```mermaid
+graph LR
+  subgraph g0["cartographer"]
+    n0["cli"]
+  end
+  subgraph g1["cartographer/agent"]
+    n1["orchestrator"]
+  end
+  subgraph g2["cartographer/graph"]
+    n2["graph/"]
+    n3["analyzer_base"]
+    n4["blast_radius"]
+    n5["graph_builder"]
+    n6["python_analyzer"]
+    n7["render"]
+  end
+  subgraph g3["cartographer/retrieval"]
+    n8["retrieval/"]
+    n9["base"]
+    n10["embedding_retriever"]
+    n11["graph_retriever"]
+    n12["seeds"]
+    n13["stub"]
+  end
+  n1 --> n9
+  n0 --> n1
+  n0 --> n5
+  n0 --> n7
+  n0 --> n8
+  n0 --> n9
+  n2 --> n3
+  n4 --> n5
+  n5 --> n3
+  n5 --> n6
+  n6 --> n3
+  n7 --> n5
+  n8 --> n9
+  n8 --> n10
+  n8 --> n11
+  n10 --> n9
+  n10 --> n13
+  n11 --> n4
+  n11 --> n5
+  n11 --> n9
+  n11 --> n12
+  n12 --> n5
+  n13 --> n9
+```
+
+`cartographer graph --format summary` ranks modules by fan-in, which is a quick check that the
+architecture is what you think it is: `retrieval/base.py` has fan-in 10 and **fan-out 0** — the
+interface every retriever answers through depends on nothing, which is the invariant the whole
+comparison rests on.
+
 Two design lines worth stating up front, because both cost something to hold:
 
 - **A retriever's only channel to the agent is `Context`.** Same dataclass, same fields, both

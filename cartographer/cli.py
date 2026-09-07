@@ -90,5 +90,47 @@ def modes() -> None:
         console.print(name)
 
 
+@app.command()
+def graph(
+    repo: Path = typer.Option(..., "--repo", exists=True, file_okay=False),
+    fmt: str = typer.Option("mermaid", "--format", help="mermaid | dot | summary"),
+    out: Path | None = typer.Option(None, "--out"),
+    exclude: str = typer.Option("", "--exclude", help="Comma-separated path fragments to drop."),
+    max_nodes: int = typer.Option(60, "--max-nodes"),
+) -> None:
+    """Draw the repo's module import graph.
+
+    Module granularity, not symbol: 46554 nodes on django is a retrieval index,
+    not a picture.
+    """
+    from .graph.graph_builder import build_graph
+    from .graph.render import module_summary, to_dot, to_mermaid
+
+    cg = build_graph(repo)
+    skip = tuple(p.strip() for p in exclude.split(",") if p.strip())
+
+    if fmt == "summary":
+        table = Table(title=f"{cg.stats['files']} modules by fan-in")
+        table.add_column("module")
+        table.add_column("fan-in", justify="right")
+        table.add_column("fan-out", justify="right")
+        for path, fin, fout in module_summary(cg)[:25]:
+            table.add_row(path, str(fin), str(fout))
+        console.print(table)
+        return
+
+    try:
+        text = to_dot(cg) if fmt == "dot" else to_mermaid(cg, exclude=skip, max_nodes=max_nodes)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2) from None
+
+    if out:
+        out.write_text(text, encoding="utf-8")
+        console.print(f"wrote {out}")
+    else:
+        sys.stdout.write(text)
+
+
 if __name__ == "__main__":
     app()
