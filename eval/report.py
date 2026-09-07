@@ -112,8 +112,24 @@ def main() -> None:
         *hitrate_section(_load(root / "phase1_hitrate.json")),
         "## Configuration ablation",
         "",
-        *ablation_section(_load(root / "phase1_ablation_wide.json"), "Wide set"),
-        *ablation_section(_load(root / "phase1_ablation.json"), "Four-repo set"),
+        "Two runs, and the interesting part is that they disagree. See the note below the tables.",
+        "",
+        *ablation_section(
+            _load(root / "phase1_ablation_large.json"), "Large repos (django, sympy)"
+        ),
+        *ablation_section(
+            _load(root / "phase1_ablation.json"), "Small repos (requests, pytest, pylint, xarray)"
+        ),
+        "### What replicated and what did not",
+        "",
+        "Dropping every name-matched call edge (`min_confidence` >= 0.60) improves recall at k=10",
+        "by 2.5 points on the small repos and does nothing on the large ones, where baseline ties",
+        "or beats every restricted configuration. **At n~60 one instance is worth 1.7 points, so",
+        "that gain was about 1.5 instances.** The default keeps the guessed edges.",
+        "",
+        "What holds on both sets: one hop is not enough, three is not better than two, and",
+        "`imports-only` -- which also discards `self.method()` resolution through the MRO -- is",
+        "worse than baseline on the large repos at every k above 5.",
     ]
     out = root / "REPORT.md"
     out.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
