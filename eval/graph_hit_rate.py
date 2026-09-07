@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -47,6 +48,37 @@ def checkout(repo: Path, sha: str) -> bool:
         capture_output=True, text=True,
     )
     return r.returncode == 0
+
+
+class FixtureLock:
+    """Exclusive claim on a fixture directory for the life of a run.
+
+    Every harness here drives the *same* clones by checking them out at each
+    instance's base_commit. Two runs sharing them silently corrupt each other:
+    one process moves HEAD while the other is mid-parse, checkouts start
+    failing, and instances are skipped rather than scored. That happened -- a
+    10-instance repo reported 1 -- and the failure looked like a code
+    regression, not a collision. Crashing is strictly better than a plausible
+    wrong number.
+    """
+
+    def __init__(self, repo_dir: Path) -> None:
+        self.path = repo_dir / ".cartographer-eval.lock"
+
+    def __enter__(self) -> FixtureLock:
+        try:
+            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            raise SystemExit(
+                f"{self.path} exists: another eval is using these checkouts.\n"
+                "Wait for it, or delete the lock if you are sure it is stale."
+            ) from None
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.path.unlink(missing_ok=True)
 
 
 def rank_files(cg, nodes, limit: int) -> list[str]:
@@ -141,10 +173,11 @@ def main() -> None:
     if wanted:
         data = [d for d in data if d["repo"].split("/")[-1] in wanted]
 
-    rows = evaluate(
-        data, Path(args.repo_dir), hops=args.hops,
-        min_confidence=args.min_confidence, verbose=not args.quiet,
-    )
+    with FixtureLock(Path(args.repo_dir)):
+        rows = evaluate(
+            data, Path(args.repo_dir), hops=args.hops,
+            min_confidence=args.min_confidence, verbose=not args.quiet,
+        )
     summary = summarise(rows)
     print(json.dumps(summary, indent=2))
     if args.out:
