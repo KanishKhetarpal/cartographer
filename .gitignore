@@ -20,3 +20,8 @@ htmlcov/
 results/**/raw_trajectories/
 eval/.cache/
 report.xml
+
+# swebench harness scratch -- per-instance patch/eval/test logs, unbounded
+# growth on every real run. results/ (committed) is the summarized verdict;
+# this is the working directory behind it.
+logs/
