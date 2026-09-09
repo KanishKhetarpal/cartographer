@@ -30,11 +30,19 @@ If the graph does not beat the baseline, that is a finding and it gets reported 
 inheritance edges; an issue is seeded lexically and expanded into a ranked blast radius. No model is
 called yet: the agent loop still emits a placeholder patch, and `Result.stub` says so.
 
+**Phase 2 — scoring is real too.** `cartographer score` grades a patch against a real SWE-bench
+instance through the actual `swebench` harness in Docker — no hand-rolled verdict logic. Verified
+against real containers on two instances, both resolved: a gold patch on `scikit-learn-14141` and
+on `django-16082` (170+ regression tests confirmed unbroken). Along the way this surfaced and fixed
+a real defect in running the harness from Windows: it writes its own eval script with `\r\n` line
+endings, which a Linux container reads as part of every path and command — see
+[`cartographer/sandbox/_win_launcher.py`](cartographer/sandbox/_win_launcher.py).
+
 | Phase | | |
 |---|---|---|
 | 0 | Scaffold: interfaces, stub CLI, tests | ✅ |
 | 1 | Code graph engine (Python analyzer, resolver, blast radius) | core ✅ |
-| 2 | Docker sandbox + SWE-bench harness wiring | |
+| 2 | Docker sandbox + SWE-bench harness wiring | ✅ |
 | 3 | LangGraph agent loop | |
 | 4 | Embedding baseline + the ≥50-task comparison | |
 | 5 | README polish, CI, architecture diagram | |

@@ -5,7 +5,7 @@ Working context for whoever picks this up next. Read this first, then `README.md
 where this file disagrees.**
 
 Repo: <https://github.com/KanishKhetarpal/cartographer> (private). Local: `~/projects/cartographer`.
-Last updated: 2026-09-07.
+Last updated: 2026-09-09.
 
 ---
 
@@ -34,22 +34,26 @@ Four invariants, all load-bearing in code:
 |---|---|
 | 0 — scaffold, interfaces, stub CLI | **done** |
 | 1 — code graph engine | **done**: analyzer, resolver, blast radius, retriever, validation, worked example, ablation |
-| 2 — Docker sandbox + SWE-bench harness | not started; **blocked on Docker daemon**, §6 |
+| 2 — Docker sandbox + SWE-bench harness | **done**: harness wrapper, verified against real Docker on two instances |
 | 3 — LangGraph agent loop | not started; **needs a spending decision**, §7 |
 | 4 — embedding baseline + the comparison | not started |
 | 5 — README/CI/diagram polish | CI done; README has results, worked example and a self-generated diagram; demo GIF outstanding |
 | 6 — MCP server (stretch) | not started |
 
 **Real now:** `graph/python_analyzer.py`, `graph/graph_builder.py`, `graph/blast_radius.py`,
-`retrieval/seeds.py`, `retrieval/graph_retriever.py`, `graph/render.py`, `cli.py`, and in `eval/`:
-`graph_hit_rate.py`, `ablation.py`, `worked_example.py`, `report.py`.
+`retrieval/seeds.py`, `retrieval/graph_retriever.py`, `graph/render.py`, `cli.py`,
+`sandbox/docker_runner.py`, `sandbox/_win_launcher.py`, and in `eval/`: `graph_hit_rate.py`,
+`ablation.py`, `worked_example.py`, `report.py`.
 
 **Still a placeholder, and says so in its own docstring:** `retrieval/embedding_retriever.py` and
 `retrieval/stub.py` (delete `stub.py` when the real baseline lands); `agent/orchestrator.py`, which
-is straight-line and emits `STUB_PATCH` with no model call.
+is straight-line and emits `STUB_PATCH` with no model call. Scoring `STUB_PATCH` through the
+sandbox would report 0/N resolved on every instance — correctly, since it's a no-op diff against a
+file named `PLACEHOLDER` — but that number means nothing until Phase 3 produces real patches.
 
 **Not created yet, deliberately** — an empty file that pretends to exist is worse than an absent
-one: `sandbox/`, `llm/client.py`, `eval/run_eval.py`, `mcp/server.py`.
+one: `llm/client.py`, `eval/run_eval.py` (the ≥50-task sweep — waits on Phase 3 for real patches
+and Phase 4 for the baseline to compare against), `mcp/server.py`.
 
 CI: `.github/workflows/ci.yml` — lint (`--no-fix`), mypy, build, tests, then a guard that reads the
 junit report and **fails on fewer than 80 tests or any skip under `CI=true`**. Green at HEAD with
@@ -170,8 +174,28 @@ detached head. They are throwaway; don't work in them. **Only one eval at a time
 
 ## 6. Known hazards
 
-- **Docker daemon is not responding.** `docker --version` answers 29.5.3 but `docker version`
-  times out (exit 124). Phase 2 cannot start until Desktop is up. Re-checked 2026-09-07.
+- **The real SWE-bench harness corrupts its own `eval.sh` on native Windows Python** —
+  `Path.write_text` with no `newline=""` turns every `\n` into `\r\n`; the container then reads
+  `cd /testbed\r` and fails every command in it, cascading through `CondaError` → missing
+  `pytest` → a genuine gold patch scoring **unresolved**. Fixed in `_win_launcher.py`
+  (monkeypatches the default before `swebench` is imported); `docker_runner.run()` always goes
+  through it, never through `-m swebench.harness.run_evaluation` directly. Confirmed fixed against
+  real Docker on two instances. **If a future swebench version, or any other subprocess, writes a
+  script for a Linux container from Windows Python, expect this again.**
+- **Docker daemon was down through 2026-09-07; up as of 2026-09-09.** No guarantee it stays up —
+  check with `docker info` (not `docker version`, see next line) before assuming Phase 2/3 work is
+  runnable.
+- ⚠️ **`docker version` can time out (exit 124) even when the daemon is genuinely up.** Confirmed
+  2026-09-09: `docker info` answered instantly (`os=linux driver=overlayfs`) in the same session
+  where `docker version` had hung minutes earlier. **Use `docker info` to check the daemon, not
+  `docker version`.**
+- **`swebench`'s dataset row schema changed since the kickoff was written.** Version 5.0.2 (what
+  `pip` resolves for `>=3.0`) no longer builds an instance's Docker image from a spec — every row
+  of `SWE-bench/SWE-bench_Verified` on Hugging Face carries a pre-built `image` field pulled from
+  Docker Hub instead. Our local `_fixtures/swebench_verified.json` predates this and has no
+  `image` key (`KeyError: 'image'` if you try). It stays correct for Phase 1, which never needed
+  that field; `sandbox/docker_runner.py` reads the HF dataset directly for scoring, never the
+  fixture.
 - **`uv` is not on PATH** — §5.
 - **Bare `python` is 3.14, not the project's 3.12**, and it reads `/tmp/x` as a Windows-relative
   path. Use `uv run python`, or `/c/Python312/python.exe` for one-off scripts.
@@ -200,6 +224,16 @@ detached head. They are throwaway; don't work in them. **Only one eval at a time
   call. No API key has been used and no spend has been incurred. Needs an explicit go-ahead, a
   provider and a budget.
 - **Repo is private.** `gh repo edit --visibility public` when the Phase-5 polish is ready.
+
+## 7a. Cost note for whoever runs Phase 4's real sweep
+
+Each real scored instance costs real time: scikit-learn-14141 took ~20s once the image was
+cached, ~75s cold (image pull); django-16082 took ~7s test runtime but a longer cold pull (django
+images run larger). **Pull time dominates on a fresh machine, not test time.** A ≥50-task sweep
+across many different repos means many different multi-GB images — budget disk (each image is
+GBs; `docker system df` before a big run) and wall-clock by pulls, not by the ~10-20s test runs
+the log will show once things are warm. This is the same lesson §4's `git checkout` cost note
+teaches for Phase 1's ablations, one layer up.
 
 ---
 
@@ -251,4 +285,8 @@ guard. **When a mutation survives, check the mutation before trusting the test.*
    re-open without a much larger n.
 3. ~~Architecture diagram for the README~~ — done, and generated by `cartographer graph` from
    this repo's own import graph rather than drawn by hand.
-4. **Phase 2** once Docker is up; **Phase 3** once the spending decision is made (§7).
+4. ~~Phase 2~~ — done 2026-09-09. `cartographer score --instance-id <id> --gold --run-id <id>`
+   runs the acceptance check by hand against real Docker.
+5. **Phase 3** once the spending decision is made (§7) — this is now the only thing standing
+   between the current state and a real end-to-end resolved-rate number. Phase 4 (the baseline +
+   comparison) can start in parallel; it needs no model call.
