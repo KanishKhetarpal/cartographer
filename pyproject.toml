@@ -11,6 +11,12 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "pydantic>=2.7",
+    # Base, not `embedding`: the embedding retriever's ranking math (cosine
+    # similarity, argsort) is real numpy code that deserves real CI coverage
+    # via a faked model, and numpy alone is ~15MB with no CUDA/torch weight
+    # behind it -- nothing like the multi-hundred-MB `embedding` extra below,
+    # which stays optional for exactly that reason.
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

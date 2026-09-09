@@ -2,8 +2,18 @@
 
 These pin the contract the whole experiment rests on: both retrievers must be
 substitutable, and `Context` must be the only thing that crosses the boundary.
-They deliberately assert on *shape*, not on retrieval quality -- quality tests
-arrive with the real retrievers in Phases 1 and 4.
+They deliberately assert on *shape*, not on retrieval quality -- quality is
+measured in `eval/`, against real repos, not in this file.
+
+Both retrievers are real as of Phase 4. `EmbeddingRetriever.retrieve()` needs
+`sentence-transformers` (the `embedding` extra, ~2GB with model weights),
+which the base CI job does not install (`uv sync --group dev`, no extras) --
+mirrors `tests/test_sandbox.py`'s treatment of the real Docker harness: unit
+logic that doesn't need the heavy dependency lives here and in
+`test_embedding_retriever.py` (which fakes the model but exercises the real
+numpy ranking code -- numpy itself is a base dependency); a real `.retrieve()`
+call against a real model is a manual/local check, not a fast-suite test, and
+no test in this file calls it.
 """
 
 from __future__ import annotations
@@ -59,7 +69,14 @@ def test_unknown_mode_is_rejected_by_name():
         build_retriever("telepathy")
 
 
-@pytest.mark.parametrize("mode", sorted(MODES))
+# Only the modes whose .retrieve() runs on the base CI install. "embedding"
+# needs the real sentence-transformers model (the `embedding` extra); its
+# ranking/budget logic is checked separately in test_embedding_retriever.py
+# with the model faked out, and its real-model behaviour is a manual check.
+_CI_SAFE_MODES = ("graph",)
+
+
+@pytest.mark.parametrize("mode", _CI_SAFE_MODES)
 def test_retrievers_return_an_identically_shaped_context(mode, issue, repo):
     ctx = build_retriever(mode, k=3).retrieve(issue, repo)
     assert isinstance(ctx, Context)
@@ -77,26 +94,22 @@ def test_retrievers_return_an_identically_shaped_context(mode, issue, repo):
         assert not s.path.startswith("/") and "\\" not in s.path
 
 
-def test_both_modes_agree_on_the_public_surface(issue, repo):
-    """The agent loop must not be able to tell the two apart by duck-typing."""
-    g = GraphRetriever(k=2).retrieve(issue, repo)
-    e = EmbeddingRetriever(k=2).retrieve(issue, repo)
-    assert type(g) is type(e)
-    def public(o):
-        return {n for n in dir(o) if not n.startswith("_")}
-
-    assert public(g) == public(e)
-    assert {"mode", "retrieve"} <= public(GraphRetriever(k=2))
-    assert {"mode", "retrieve"} <= public(EmbeddingRetriever(k=2))
-    assert g.mode != e.mode  # the only Context field that may differ by construction
-
-
-def test_a_placeholder_retriever_still_flags_itself(issue, repo):
-    """Guard against a placeholder run being scored as a result. The graph
-    retriever is real as of Phase 1; the embedding baseline lands in Phase 4 and
-    must keep saying so until it does."""
-    assert EmbeddingRetriever(k=2).retrieve(issue, repo).stats.get("stub") is True
-    assert GraphRetriever(k=2).retrieve(issue, repo).stats.get("stub") is None
+def test_both_modes_agree_on_the_caller_facing_surface():
+    """The agent loop must not be able to tell the two apart by duck-typing --
+    but only on what it actually touches. `max_hops` and `chunk_lines` are
+    real, and reasonably different, tuning knobs; asserting full `dir()`
+    equality would fail on those forever and prove nothing the loop cares
+    about. Constructs both retrievers, calls .retrieve() on neither --
+    embedding's needs the optional extra (see module docstring); the fact that
+    both produce a `Context` when called is guaranteed by the `Retriever`
+    protocol's return-type annotation (checked statically by mypy for every
+    class here) and, for the mode that runs in CI, verified for real by
+    test_retrievers_return_an_identically_shaped_context above."""
+    g, e = GraphRetriever(k=2), EmbeddingRetriever(k=2)
+    caller_facing = {"mode", "retrieve"}
+    assert caller_facing <= {n for n in dir(g) if not n.startswith("_")}
+    assert caller_facing <= {n for n in dir(e) if not n.startswith("_")}
+    assert g.mode != e.mode  # the one thing that must differ
 
 
 def test_a_run_is_flagged_stubbed_while_no_model_is_called(issue, repo):
