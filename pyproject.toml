@@ -24,6 +24,7 @@ agent = [
 eval = [
     "datasets>=2.20",
     "docker>=7.1",
+    "swebench>=3.0",
 ]
 embedding = [
     "faiss-cpu>=1.8",
