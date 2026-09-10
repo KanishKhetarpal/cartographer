@@ -45,7 +45,7 @@ endings, which a Linux container reads as part of every path and command — see
 | 2 | Docker sandbox + SWE-bench harness wiring | ✅ |
 | 3 | LangGraph agent loop | |
 | 4 | Embedding baseline + the ≥50-task comparison | retrieval half ✅, resolved-rate half needs Phase 3 |
-| 5 | README polish, CI, architecture diagram | |
+| 5 | README polish, CI, architecture diagram | CI ✅, diagram ✅, demo GIF outstanding |
 | 6 | Stretch: MCP server | |
 
 ### Where the graph stands today
