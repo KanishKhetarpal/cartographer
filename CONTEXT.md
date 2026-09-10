@@ -57,7 +57,7 @@ and Phase 4 for the baseline to compare against), `mcp/server.py`.
 
 CI: `.github/workflows/ci.yml` — lint (`--no-fix`), mypy, build, tests, then a guard that reads the
 junit report and **fails on fewer than 80 tests or any skip under `CI=true`**. Green at HEAD with
-144 tests, 0 skipped.
+152 tests, 0 skipped.
 
 ---
 
@@ -182,7 +182,7 @@ export PATH="/c/Users/Kanish/AppData/Roaming/Python/Python312/Scripts:$PATH"
 
 ```bash
 uv sync --group dev
-uv run pytest                       # 114 tests
+uv run pytest                       # 152 tests
 uv run ruff check .                 # must be clean; CI lint never --fix
 uv run --with mypy mypy cartographer --ignore-missing-imports
 uv run cartographer resolve --repo . --issue issue.txt --mode graph --k 6
