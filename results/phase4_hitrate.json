@@ -1,0 +1,868 @@
+{
+ "summary": {
+  "instances": 59,
+  "recall_embedding@1": 0.1441,
+  "anyhit_embedding@1": 0.1695,
+  "recall_embedding@3": 0.4407,
+  "anyhit_embedding@3": 0.4915,
+  "recall_embedding@5": 0.572,
+  "anyhit_embedding@5": 0.6271,
+  "recall_embedding@10": 0.7076,
+  "anyhit_embedding@10": 0.7627,
+  "recall_embedding@20": 0.75,
+  "anyhit_embedding@20": 0.7966
+ },
+ "config": {
+  "dataset": "../_fixtures/swebench_verified.json",
+  "repo_dir": "../_fixtures",
+  "repos": "requests,pytest,pylint,xarray",
+  "chunk_lines": 40,
+  "out": "results/phase4_hitrate.json",
+  "quiet": false
+ },
+ "rows": [
+  {
+   "id": "psf__requests-1142",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/models.py"
+   ],
+   "chunks": 381,
+   "seconds": 25.48,
+   "embedding@1": 1.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "psf__requests-1724",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/sessions.py"
+   ],
+   "chunks": 444,
+   "seconds": 10.79,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "psf__requests-1766",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/auth.py"
+   ],
+   "chunks": 448,
+   "seconds": 10.46,
+   "embedding@1": 1.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "psf__requests-1921",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/sessions.py"
+   ],
+   "chunks": 462,
+   "seconds": 11.11,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "psf__requests-2317",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/sessions.py"
+   ],
+   "chunks": 492,
+   "seconds": 13.19,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "psf__requests-2931",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/models.py"
+   ],
+   "chunks": 530,
+   "seconds": 13.94,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "psf__requests-5414",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/models.py"
+   ],
+   "chunks": 271,
+   "seconds": 8.25,
+   "embedding@1": 1.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "psf__requests-6028",
+   "repo": "psf/requests",
+   "gold": [
+    "requests/utils.py"
+   ],
+   "chunks": 272,
+   "seconds": 7.7,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-2905",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/variable.py"
+   ],
+   "chunks": 2522,
+   "seconds": 70.1,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-3095",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/indexing.py",
+    "xarray/core/variable.py"
+   ],
+   "chunks": 1771,
+   "seconds": 51.66,
+   "embedding@1": 0.0,
+   "embedding@3": 0.5,
+   "embedding@5": 0.5,
+   "embedding@10": 0.5,
+   "embedding@20": 0.5
+  },
+  {
+   "id": "pydata__xarray-3151",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/combine.py"
+   ],
+   "chunks": 1766,
+   "seconds": 46.04,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-3305",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/dataset.py",
+    "xarray/core/variable.py"
+   ],
+   "chunks": 1945,
+   "seconds": 55.52,
+   "embedding@1": 0.0,
+   "embedding@3": 0.5,
+   "embedding@5": 0.5,
+   "embedding@10": 0.5,
+   "embedding@20": 0.5
+  },
+  {
+   "id": "pydata__xarray-3677",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/dataset.py"
+   ],
+   "chunks": 2171,
+   "seconds": 60.84,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-3993",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/dataarray.py",
+    "xarray/core/dataset.py"
+   ],
+   "chunks": 2498,
+   "seconds": 67.8,
+   "embedding@1": 0.5,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-4075",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/weighted.py"
+   ],
+   "chunks": 2283,
+   "seconds": 61.54,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-4094",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/dataarray.py"
+   ],
+   "chunks": 2303,
+   "seconds": 78.14,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-4356",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/nanops.py"
+   ],
+   "chunks": 2379,
+   "seconds": 63.35,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-4629",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/merge.py"
+   ],
+   "chunks": 2454,
+   "seconds": 63.13,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-4687",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/computation.py"
+   ],
+   "chunks": 3018,
+   "seconds": 76.79,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pydata__xarray-4695",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/dataarray.py"
+   ],
+   "chunks": 2459,
+   "seconds": 62.7,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-4966",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/coding/variables.py"
+   ],
+   "chunks": 2539,
+   "seconds": 64.86,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-6461",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/computation.py"
+   ],
+   "chunks": 3165,
+   "seconds": 80.72,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-6599",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/computation.py"
+   ],
+   "chunks": 3173,
+   "seconds": 80.52,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pydata__xarray-6721",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/common.py"
+   ],
+   "chunks": 3244,
+   "seconds": 82.41,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-6744",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/rolling.py"
+   ],
+   "chunks": 3263,
+   "seconds": 82.01,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-6938",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/dataset.py",
+    "xarray/core/variable.py"
+   ],
+   "chunks": 3284,
+   "seconds": 83.59,
+   "embedding@1": 0.5,
+   "embedding@3": 0.5,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-6992",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/dataset.py",
+    "xarray/core/indexes.py"
+   ],
+   "chunks": 3301,
+   "seconds": 84.16,
+   "embedding@1": 0.0,
+   "embedding@3": 0.5,
+   "embedding@5": 0.5,
+   "embedding@10": 0.5,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-7229",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/computation.py"
+   ],
+   "chunks": 3499,
+   "seconds": 89.66,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-7233",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/rolling.py"
+   ],
+   "chunks": 3476,
+   "seconds": 88.55,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pydata__xarray-7393",
+   "repo": "pydata/xarray",
+   "gold": [
+    "xarray/core/indexing.py"
+   ],
+   "chunks": 3516,
+   "seconds": 88.93,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pylint-dev__pylint-4551",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/pyreverse/diagrams.py",
+    "pylint/pyreverse/inspector.py",
+    "pylint/pyreverse/utils.py",
+    "pylint/pyreverse/writer.py"
+   ],
+   "chunks": 2299,
+   "seconds": 58.36,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pylint-dev__pylint-4604",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/checkers/variables.py",
+    "pylint/constants.py"
+   ],
+   "chunks": 2306,
+   "seconds": 53.14,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pylint-dev__pylint-4661",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/config/__init__.py"
+   ],
+   "chunks": 2360,
+   "seconds": 55.9,
+   "embedding@1": 1.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pylint-dev__pylint-4970",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/checkers/similar.py"
+   ],
+   "chunks": 2403,
+   "seconds": 56.74,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pylint-dev__pylint-6386",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/config/argument.py",
+    "pylint/config/arguments_manager.py",
+    "pylint/config/utils.py",
+    "pylint/lint/base_options.py"
+   ],
+   "chunks": 3154,
+   "seconds": 73.94,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.25,
+   "embedding@10": 0.25,
+   "embedding@20": 0.25
+  },
+  {
+   "id": "pylint-dev__pylint-6528",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/lint/expand_modules.py",
+    "pylint/lint/pylinter.py"
+   ],
+   "chunks": 3260,
+   "seconds": 71.98,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pylint-dev__pylint-6903",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/lint/run.py"
+   ],
+   "chunks": 3698,
+   "seconds": 74.82,
+   "embedding@1": 1.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pylint-dev__pylint-7080",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/lint/expand_modules.py"
+   ],
+   "chunks": 3783,
+   "seconds": 75.71,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pylint-dev__pylint-7277",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/__init__.py"
+   ],
+   "chunks": 3810,
+   "seconds": 76.18,
+   "embedding@1": 1.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pylint-dev__pylint-8898",
+   "repo": "pylint-dev/pylint",
+   "gold": [
+    "pylint/config/argument.py",
+    "pylint/utils/__init__.py",
+    "pylint/utils/utils.py"
+   ],
+   "chunks": 4199,
+   "seconds": 90.32,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pytest-dev__pytest-10051",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/logging.py"
+   ],
+   "chunks": 2144,
+   "seconds": 56.0,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-10081",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/unittest.py"
+   ],
+   "chunks": 2144,
+   "seconds": 53.42,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-10356",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/mark/structures.py"
+   ],
+   "chunks": 2158,
+   "seconds": 53.94,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-5262",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/capture.py"
+   ],
+   "chunks": 1643,
+   "seconds": 42.48,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-5631",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/compat.py"
+   ],
+   "chunks": 1646,
+   "seconds": 42.11,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-5787",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/reports.py"
+   ],
+   "chunks": 1665,
+   "seconds": 41.79,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pytest-dev__pytest-5809",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/pastebin.py"
+   ],
+   "chunks": 1668,
+   "seconds": 43.09,
+   "embedding@1": 1.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-5840",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/config/__init__.py",
+    "src/_pytest/pathlib.py"
+   ],
+   "chunks": 1670,
+   "seconds": 42.06,
+   "embedding@1": 0.5,
+   "embedding@3": 0.5,
+   "embedding@5": 0.5,
+   "embedding@10": 0.5,
+   "embedding@20": 0.5
+  },
+  {
+   "id": "pytest-dev__pytest-6197",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/python.py"
+   ],
+   "chunks": 1685,
+   "seconds": 42.78,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pytest-dev__pytest-6202",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/python.py"
+   ],
+   "chunks": 1685,
+   "seconds": 41.47,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pytest-dev__pytest-7205",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/setuponly.py"
+   ],
+   "chunks": 1837,
+   "seconds": 46.81,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pytest-dev__pytest-7236",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/unittest.py"
+   ],
+   "chunks": 1842,
+   "seconds": 46.1,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-7324",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/mark/expression.py"
+   ],
+   "chunks": 1885,
+   "seconds": 47.52,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 0.0,
+   "embedding@10": 0.0,
+   "embedding@20": 0.0
+  },
+  {
+   "id": "pytest-dev__pytest-7432",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/skipping.py"
+   ],
+   "chunks": 1934,
+   "seconds": 46.99,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-7490",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/skipping.py"
+   ],
+   "chunks": 1935,
+   "seconds": 40.16,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-7521",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/capture.py"
+   ],
+   "chunks": 1939,
+   "seconds": 39.97,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-7571",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/logging.py"
+   ],
+   "chunks": 1940,
+   "seconds": 40.36,
+   "embedding@1": 0.0,
+   "embedding@3": 1.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-7982",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/pathlib.py"
+   ],
+   "chunks": 1966,
+   "seconds": 41.38,
+   "embedding@1": 0.0,
+   "embedding@3": 0.0,
+   "embedding@5": 1.0,
+   "embedding@10": 1.0,
+   "embedding@20": 1.0
+  },
+  {
+   "id": "pytest-dev__pytest-8399",
+   "repo": "pytest-dev/pytest",
+   "gold": [
+    "src/_pytest/python.py",
+    "src/_pytest/unittest.py"
+   ],
+   "chunks": 2052,
+   "seconds": 42.87,
+   "embedding@1": 0.0,
+   "embedding@3": 0.5,
+   "embedding@5": 0.5,
+   "embedding@10": 0.5,
+   "embedding@20": 0.5
+  }
+ ]
+}

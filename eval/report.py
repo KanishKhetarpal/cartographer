@@ -57,6 +57,45 @@ def hitrate_section(d: dict | None) -> list[str]:
     return out
 
 
+def embedding_section(hitrate: dict | None, embed: dict | None) -> list[str]:
+    if not embed or "summary" not in embed:
+        return ["_No `phase4_hitrate.json` present._", ""]
+    if not hitrate or "summary" not in hitrate:
+        return ["_No `phase1_hitrate.json` present -- need the graph numbers to compare._", ""]
+    hs, es = hitrate["summary"], embed["summary"]
+    n = es["instances"]
+    out = [
+        f"Same **{n}** instances as the retrieval table above, same k values, the real",
+        "`EmbeddingRetriever` (sentence-transformers/all-MiniLM-L6-v2, fixed-size line-window",
+        "chunks, cosine top-k -- no function/class awareness, so it can't borrow the graph's own",
+        "idea) against the shipped `GraphRetriever`.",
+        "",
+        f"One instance is worth {100 / n:.1f} points -- a delta under that is noise, not a result.",
+        "",
+        "| k | graph | embedding | delta |",
+        "|---|---|---|---|",
+    ]
+    for k in K_ORDER:
+        g, e = hs.get(f"recall_graph@{k}"), es.get(f"recall_embedding@{k}")
+        if g is None or e is None:
+            continue
+        out.append(f"| {k} | {g:.3f} | {e:.3f} | {g - e:+.3f} |")
+    out += [
+        "",
+        "Graph leads clearly at k=1 and k=3 -- where the thesis says the graph should matter",
+        "*least*, since the issue text alone should already answer it. The lead shrinks through",
+        f"k=5, and at k=10 embedding edges ahead ({es['recall_embedding@10']:.3f} vs.",
+        f"{hs['recall_graph@10']:.3f}) before graph retakes a lead at k=20 that is itself inside",
+        "the noise floor. **Not a clean win.** k=1/k=3 are real (7.5 and ~4 instances); k=10/k=20",
+        "are not (≤1.5 instances each way).",
+        "",
+        "⚠️ **This measures retrieval, not resolution.** Neither retriever has produced a patch",
+        "that was scored against the real test suite. That number needs Phase 3's agent loop.",
+        "",
+    ]
+    return out
+
+
 def ablation_section(d: dict | None, title: str) -> list[str]:
     if not d or "recall" not in d:
         return [f"_No results for {title}._", ""]
@@ -105,11 +144,17 @@ def main() -> None:
         "files against the files the gold patch actually touches.",
         "",
         "⚠️ **This measures retrieval, not resolution.** No model is called yet, so nothing here",
-        "is a SWE-bench resolved-rate. That number arrives in Phase 4.",
+        "is a SWE-bench resolved-rate. That number needs Phase 3's agent loop to produce real",
+        "patches for the sandbox to score.",
         "",
         "## Retrieval vs. the no-graph control",
         "",
         *hitrate_section(_load(root / "phase1_hitrate.json")),
+        "## Retrieval vs. the embedding baseline",
+        "",
+        *embedding_section(
+            _load(root / "phase1_hitrate.json"), _load(root / "phase4_hitrate.json")
+        ),
         "## Configuration ablation",
         "",
         "Two runs, and the interesting part is that they disagree. See the note below the tables.",

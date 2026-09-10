@@ -1,13 +1,14 @@
 # Cartographer — results
 
-_Generated 2026-09-07 by `uv run python eval/report.py`._
+_Generated 2026-09-10 by `uv run python eval/report.py`._
 
 Every number here comes from checking a repo out at a SWE-bench Verified instance's
 `base_commit`, seeding the graph from the issue text alone, and comparing the ranked
 files against the files the gold patch actually touches.
 
 ⚠️ **This measures retrieval, not resolution.** No model is called yet, so nothing here
-is a SWE-bench resolved-rate. That number arrives in Phase 4.
+is a SWE-bench resolved-rate. That number needs Phase 3's agent loop to produce real
+patches for the sandbox to score.
 
 ## Retrieval vs. the no-graph control
 
@@ -23,6 +24,33 @@ traversal at all -- the floor the graph has to beat to have earned anything.
 | 5 | 0.616 | 0.599 | +0.017 |
 | 10 | 0.684 | 0.633 | +0.051 |
 | 20 | 0.774 | 0.633 | +0.141 |
+
+## Retrieval vs. the embedding baseline
+
+Same **59** instances as the retrieval table above, same k values, the real
+`EmbeddingRetriever` (sentence-transformers/all-MiniLM-L6-v2, fixed-size line-window
+chunks, cosine top-k -- no function/class awareness, so it can't borrow the graph's own
+idea) against the shipped `GraphRetriever`.
+
+One instance is worth 1.7 points -- a delta under that is noise, not a result.
+
+| k | graph | embedding | delta |
+|---|---|---|---|
+| 1 | 0.356 | 0.144 | +0.212 |
+| 3 | 0.556 | 0.441 | +0.116 |
+| 5 | 0.616 | 0.572 | +0.044 |
+| 10 | 0.684 | 0.708 | -0.024 |
+| 20 | 0.774 | 0.750 | +0.024 |
+
+Graph leads clearly at k=1 and k=3 -- where the thesis says the graph should matter
+*least*, since the issue text alone should already answer it. The lead shrinks through
+k=5, and at k=10 embedding edges ahead (0.708 vs.
+0.684) before graph retakes a lead at k=20 that is itself inside
+the noise floor. **Not a clean win.** k=1/k=3 are real (7.5 and ~4 instances); k=10/k=20
+are not (≤1.5 instances each way).
+
+⚠️ **This measures retrieval, not resolution.** Neither retriever has produced a patch
+that was scored against the real test suite. That number needs Phase 3's agent loop.
 
 ## Configuration ablation
 
