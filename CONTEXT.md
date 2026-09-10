@@ -5,7 +5,7 @@ Working context for whoever picks this up next. Read this first, then `README.md
 where this file disagrees.**
 
 Repo: <https://github.com/KanishKhetarpal/cartographer> (private). Local: `~/projects/cartographer`.
-Last updated: 2026-09-09.
+Last updated: 2026-09-10.
 
 ---
 
@@ -36,20 +36,20 @@ Four invariants, all load-bearing in code:
 | 1 — code graph engine | **done**: analyzer, resolver, blast radius, retriever, validation, worked example, ablation |
 | 2 — Docker sandbox + SWE-bench harness | **done**: harness wrapper, verified against real Docker on two instances |
 | 3 — LangGraph agent loop | not started; **needs a spending decision**, §7 |
-| 4 — embedding baseline + the comparison | not started |
+| 4 — embedding baseline + the comparison | **retrieval-side done** 2026-09-10: real `EmbeddingRetriever`, `embedding_hit_rate.py`, and the full graph-vs-embedding run on the same 59 instances Phase 1 used — see §4. The resolved-rate half still needs Phase 3. |
 | 5 — README/CI/diagram polish | CI done; README has results, worked example and a self-generated diagram; demo GIF outstanding |
 | 6 — MCP server (stretch) | not started |
 
 **Real now:** `graph/python_analyzer.py`, `graph/graph_builder.py`, `graph/blast_radius.py`,
-`retrieval/seeds.py`, `retrieval/graph_retriever.py`, `graph/render.py`, `cli.py`,
-`sandbox/docker_runner.py`, `sandbox/_win_launcher.py`, and in `eval/`: `graph_hit_rate.py`,
-`ablation.py`, `worked_example.py`, `report.py`.
+`retrieval/seeds.py`, `retrieval/graph_retriever.py`, `retrieval/embedding_retriever.py`,
+`graph/render.py`, `cli.py`, `sandbox/docker_runner.py`, `sandbox/_win_launcher.py`, and in `eval/`:
+`graph_hit_rate.py`, `embedding_hit_rate.py`, `ablation.py`, `worked_example.py`, `report.py`.
 
-**Still a placeholder, and says so in its own docstring:** `retrieval/embedding_retriever.py` and
-`retrieval/stub.py` (delete `stub.py` when the real baseline lands); `agent/orchestrator.py`, which
-is straight-line and emits `STUB_PATCH` with no model call. Scoring `STUB_PATCH` through the
-sandbox would report 0/N resolved on every instance — correctly, since it's a no-op diff against a
-file named `PLACEHOLDER` — but that number means nothing until Phase 3 produces real patches.
+**Still a placeholder, and says so in its own docstring:** `agent/orchestrator.py`, which is
+straight-line and emits `STUB_PATCH` with no model call. Scoring `STUB_PATCH` through the sandbox
+would report 0/N resolved on every instance — correctly, since it's a no-op diff against a file
+named `PLACEHOLDER` — but that number means nothing until Phase 3 produces real patches.
+(`retrieval/stub.py` is gone — deleted once `EmbeddingRetriever` stopped needing a placeholder.)
 
 **Not created yet, deliberately** — an empty file that pretends to exist is worse than an absent
 one: `llm/client.py`, `eval/run_eval.py` (the ≥50-task sweep — waits on Phase 3 for real patches
@@ -57,7 +57,7 @@ and Phase 4 for the baseline to compare against), `mcp/server.py`.
 
 CI: `.github/workflows/ci.yml` — lint (`--no-fix`), mypy, build, tests, then a guard that reads the
 junit report and **fails on fewer than 80 tests or any skip under `CI=true`**. Green at HEAD with
-114 tests, 0 skipped.
+144 tests, 0 skipped.
 
 ---
 
@@ -125,6 +125,27 @@ sympy 0.833/0.796 · pytest 0.737/0.553 · django 0.719/0.603 · **pylint 0.267/
 ⚠️ **pylint fails on seeding, not on traversal.** Median 2 seeds per issue against xarray's 9,
 because its issues quote CLI flags and message codes rather than naming code. The split is total:
 all seven instances with ≤3 seeds scored 0.00 at every k; all three with ≥8 seeds scored 0.67-1.00.
+
+**Embedding baseline, same 59 instances as the retrieval table** —
+`results/phase4_hitrate.json`, real `EmbeddingRetriever` (all-MiniLM-L6-v2, fixed 40-line chunks,
+cosine top-k, no function/class awareness):
+
+| k | graph | embedding | delta |
+|---|---|---|---|
+| 1 | 0.356 | 0.144 | +0.212 |
+| 3 | 0.556 | 0.441 | +0.116 |
+| 5 | 0.616 | 0.572 | +0.044 |
+| 10 | 0.684 | 0.708 | -0.024 |
+| 20 | 0.774 | 0.750 | +0.024 |
+
+⚠️ **Not a clean win, and say so.** Graph leads clearly at k=1/k=3 — where the thesis says it
+should matter *least*, since the issue text alone should already answer it there — worth 7.5 and
+~4 instances respectively, well above the ~1.7-point noise floor at n=59. The lead shrinks through
+k=5, and **at k=10 embedding edges ahead**, before graph retakes a k=20 lead that is itself
+noise-sized (≤1.5 instances either way). Read the k=1/k=3 result as real; read k=10/k=20 as "no
+finding" until n is larger — same discipline as the ablation replication note above.
+This is retrieval only — no patch has been scored — and rendered in `results/REPORT.md` via
+`eval/report.py`.
 
 **Worked example** — `pytest-dev__pytest-7236`, in the README: the issue names no file at all, so
 lexical retrieval scores 0.00 at every k; the graph reaches the gold file at rank 9 of 217 through
@@ -287,6 +308,12 @@ guard. **When a mutation survives, check the mutation before trusting the test.*
    this repo's own import graph rather than drawn by hand.
 4. ~~Phase 2~~ — done 2026-09-09. `cartographer score --instance-id <id> --gold --run-id <id>`
    runs the acceptance check by hand against real Docker.
-5. **Phase 3** once the spending decision is made (§7) — this is now the only thing standing
-   between the current state and a real end-to-end resolved-rate number. Phase 4 (the baseline +
-   comparison) can start in parallel; it needs no model call.
+5. ~~Phase 4 retrieval-side comparison~~ — done 2026-09-10, see §4. The graph-vs-embedding number
+   is real but mixed (graph wins clearly at k≤3, embedding edges ahead at k=10 inside noise). Does
+   **not** close out Phase 4's stated goal ("the comparison") — that's resolved-rate, which needs
+   Phase 3.
+6. **Phase 3** once the spending decision is made (§7) — this is now the only thing standing
+   between the current state and a real end-to-end resolved-rate number, and the only remaining
+   blocker on the project's actual thesis (§1). Once it lands, `eval/run_eval.py` (the ≥50-task
+   sweep, not created yet) is the last piece: run both retrievers through the same agent loop and
+   score both through the real sandbox.

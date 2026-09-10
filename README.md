@@ -44,7 +44,7 @@ endings, which a Linux container reads as part of every path and command — see
 | 1 | Code graph engine (Python analyzer, resolver, blast radius) | core ✅ |
 | 2 | Docker sandbox + SWE-bench harness wiring | ✅ |
 | 3 | LangGraph agent loop | |
-| 4 | Embedding baseline + the ≥50-task comparison | |
+| 4 | Embedding baseline + the ≥50-task comparison | retrieval half ✅, resolved-rate half needs Phase 3 |
 | 5 | README polish, CI, architecture diagram | |
 | 6 | Stretch: MCP server | |
 
@@ -70,6 +70,31 @@ wants, and it is reported rather than rounded off.
 
 Reproduce with `uv run python eval/graph_hit_rate.py <swebench.json> <repo-dir> --repos requests`;
 raw rows in [`results/phase1_hitrate.json`](results/phase1_hitrate.json).
+
+### Graph vs. the embedding baseline
+
+Same 59 instances, same k values, the real `EmbeddingRetriever` (sentence-transformers/
+all-MiniLM-L6-v2, fixed 40-line chunks, cosine top-k — deliberately no function/class awareness,
+so the control can't borrow the graph's own idea).
+
+| k | graph | embedding | delta |
+|---|---|---|---|
+| 1 | 0.356 | 0.144 | +0.212 |
+| 3 | 0.556 | 0.441 | +0.116 |
+| 5 | 0.616 | 0.572 | +0.044 |
+| 10 | 0.684 | **0.708** | -0.024 |
+| 20 | **0.774** | 0.750 | +0.024 |
+
+**Not a clean win.** The graph leads clearly at k=1/k=3 — worth 7.5 and ~4 instances, well above
+the ~1.7-point noise floor at n=59 — which is exactly where the thesis says it should matter
+*least*, since the issue text alone should already answer it there. The lead shrinks through k=5,
+and at k=10 the embedding baseline edges ahead, before the graph retakes a k=20 lead that is
+itself noise-sized. This is retrieval only, not a resolved-rate — that comparison needs Phase 3's
+agent loop to produce real patches for the sandbox to score.
+
+Reproduce with `uv run python eval/embedding_hit_rate.py <swebench.json> <repo-dir> --repos
+requests,pytest,pylint,xarray`; raw rows in
+[`results/phase4_hitrate.json`](results/phase4_hitrate.json).
 
 ### Worked example: a file the issue never mentions
 
@@ -182,7 +207,9 @@ graph LR
     n10["embedding_retriever"]
     n11["graph_retriever"]
     n12["seeds"]
-    n13["stub"]
+  end
+  subgraph g4["cartographer/sandbox"]
+    n13["docker_runner"]
   end
   n1 --> n9
   n0 --> n1
@@ -190,6 +217,7 @@ graph LR
   n0 --> n7
   n0 --> n8
   n0 --> n9
+  n0 --> n13
   n2 --> n3
   n4 --> n5
   n5 --> n3
@@ -200,13 +228,11 @@ graph LR
   n8 --> n10
   n8 --> n11
   n10 --> n9
-  n10 --> n13
   n11 --> n4
   n11 --> n5
   n11 --> n9
   n11 --> n12
   n12 --> n5
-  n13 --> n9
 ```
 
 `cartographer graph --format summary` ranks modules by fan-in, which is a quick check that the
