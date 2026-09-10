@@ -147,6 +147,17 @@ finding" until n is larger — same discipline as the ablation replication note 
 This is retrieval only — no patch has been scored — and rendered in `results/REPORT.md` via
 `eval/report.py`.
 
+**Literal seeding, probed against all 10 pylint instances** — `eval/probe_literal_seeding.py`:
+extract CLI flags (`--ignore-paths`) and message codes (`W0611`) from the issue text, and check
+whether the string occurs in the gold file and in ≤8 files total (any more and it is not a useful
+seed regardless of whether one of those files is gold).
+
+⚠️ **The premise mostly does not hold. Only 2 of 10 instances would be reached.** 5 instances have
+no candidate literal in the issue text at all; 3 more have selective candidates (≤8 files) that
+never land on gold — e.g. pylint-7080 has 11 useful candidates and none is the gold file. Literal
+seeding is not the broad fix the framing in next-actions #1 (below, now struck through) implied.
+It would help a real but small slice of pylint, not close the gap.
+
 **Worked example** — `pytest-dev__pytest-7236`, in the README: the issue names no file at all, so
 lexical retrieval scores 0.00 at every k; the graph reaches the gold file at rank 9 of 217 through
 one call edge from `outcomes.py::skip`, in ~604 tokens. Regenerate with `eval/worked_example.py`.
@@ -293,13 +304,12 @@ guard. **When a mutation survives, check the mutation before trusting the test.*
 
 ## 10. Next actions, in order
 
-1. **Close the small-k gap** — still the headline weakness (nothing gained at k≤3), and the
-   pylint evidence says the lever is **seeding**, not traversal.
-   - pylint is the worst repo (~0.23) because its issues name **CLI flags and message codes**
-     (`--ignore-paths`, `W0611`), not identifiers. Those strings live verbatim in the source that
-     implements them, so a literal index would seed them. **Probe first**
-     (`probe_literals.py` sketch exists in `%TEMP%`): does the string occur in the gold file, and
-     in how many others?
+1. **Close the small-k gap** — still the headline weakness (nothing gained at k≤3).
+   - ~~Probe whether literal seeding (CLI flags, message codes) reaches pylint's gold files~~ —
+     done 2026-09-10, see §4. **It mostly does not: 2/10.** The lever is not "index the literals
+     pylint's issues already contain" — that premise is mostly false. Either a smaller, more
+     targeted use of literal seeding (only the 2/10 it demonstrably helps) or a different lever
+     entirely is needed; this doesn't reopen the seeding-vs-traversal question, it narrows it.
    - Consider file-diversity in snippet selection: an issue naming several symbols in one file
      currently consumes all of `k` before the graph contributes anything.
 2. ~~Settle the `min_confidence` finding~~ — done, it did not replicate; default stays. Don't
