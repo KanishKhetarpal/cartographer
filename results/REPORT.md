@@ -43,11 +43,11 @@ One instance is worth 1.7 points -- a delta under that is noise, not a result.
 | 20 | 0.774 | 0.750 | +0.024 |
 
 Graph leads clearly at k=1 and k=3 -- where the thesis says the graph should matter
-*least*, since the issue text alone should already answer it. The lead shrinks through
-k=5, and at k=10 embedding edges ahead (0.708 vs.
-0.684) before graph retakes a lead at k=20 that is itself inside
-the noise floor. **Not a clean win.** k=1/k=3 are real (7.5 and ~4 instances); k=10/k=20
-are not (≤1.5 instances each way).
+*least*, since the issue text alone should already answer it. The lead shrinks
+through k=5, and at k=10 embedding edges ahead (0.708 vs. 0.684) before
+graph retakes a lead at k=20 that is itself inside the noise floor. **Not a clean
+win.**
+k=1/k=3 are real (7.5 and ~4 instances); k=10/k=20 are not (≤1.5 instances each way).
 
 ⚠️ **This measures retrieval, not resolution.** Neither retriever has produced a patch
 that was scored against the real test suite. That number needs Phase 3's agent loop.

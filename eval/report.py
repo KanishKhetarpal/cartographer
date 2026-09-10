@@ -75,20 +75,24 @@ def embedding_section(hitrate: dict | None, embed: dict | None) -> list[str]:
         "| k | graph | embedding | delta |",
         "|---|---|---|---|",
     ]
+    g10, e10 = hs.get("recall_graph@10"), es.get("recall_embedding@10")
     for k in K_ORDER:
         g, e = hs.get(f"recall_graph@{k}"), es.get(f"recall_embedding@{k}")
         if g is None or e is None:
             continue
         out.append(f"| {k} | {g:.3f} | {e:.3f} | {g - e:+.3f} |")
+    out.append("")
+    if g10 is not None and e10 is not None:
+        out += [
+            "Graph leads clearly at k=1 and k=3 -- where the thesis says the graph should matter",
+            "*least*, since the issue text alone should already answer it. The lead shrinks",
+            f"through k=5, and at k=10 embedding edges ahead ({e10:.3f} vs. {g10:.3f}) before",
+            "graph retakes a lead at k=20 that is itself inside the noise floor. **Not a clean",
+            "win.**",
+            "k=1/k=3 are real (7.5 and ~4 instances); k=10/k=20 are not (≤1.5 instances each way).",
+            "",
+        ]
     out += [
-        "",
-        "Graph leads clearly at k=1 and k=3 -- where the thesis says the graph should matter",
-        "*least*, since the issue text alone should already answer it. The lead shrinks through",
-        f"k=5, and at k=10 embedding edges ahead ({es['recall_embedding@10']:.3f} vs.",
-        f"{hs['recall_graph@10']:.3f}) before graph retakes a lead at k=20 that is itself inside",
-        "the noise floor. **Not a clean win.** k=1/k=3 are real (7.5 and ~4 instances); k=10/k=20",
-        "are not (≤1.5 instances each way).",
-        "",
         "⚠️ **This measures retrieval, not resolution.** Neither retriever has produced a patch",
         "that was scored against the real test suite. That number needs Phase 3's agent loop.",
         "",
