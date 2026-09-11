@@ -124,11 +124,35 @@ class GraphRetriever:
     def retrieve(self, issue: Issue, repo: RepoRef, *, budget_tokens: int = 8000) -> Context:
         cg = self._build(repo)
         order, stats = self.rank(issue, cg)
+        original_rank = {node: i for i, node in enumerate(order, start=1)}
+
+        # File-diversity pass: take each file's best-ranked node first, in rank
+        # order, before a second node from any file already covered. Otherwise
+        # a file with several highly-ranked symbols can spend all of k before a
+        # second file is considered at all -- measured on 59 real instances
+        # (eval/probe_snippet_diversity.py) to cost ~6 points of delivered file
+        # recall at the default k=12 and to drop the gold file entirely for
+        # 5/59, all cases where the unbounded ranking had already reached it
+        # within the same k, just spread across nodes the snippet budget never
+        # got to. This does not change *which* node represents a given file --
+        # that is still whichever ranks first for that path in `order` -- only
+        # the order files are covered in.
+        diversified: list[str] = []
+        leftover: list[str] = []
+        seen_files: set[str] = set()
+        for node in order:
+            path = cg.g.nodes[node]["path"]
+            if path in seen_files:
+                leftover.append(node)
+            else:
+                seen_files.add(path)
+                diversified.append(node)
+        diversified.extend(leftover)
 
         snippets: list[Snippet] = []
         used = 0
         truncated = 0
-        for rank, node in enumerate(order, start=1):
+        for node in diversified:
             if len(snippets) >= self.k or used >= budget_tokens:
                 break
             d = cg.g.nodes[node]
@@ -157,7 +181,7 @@ class GraphRetriever:
                     text=text,
                     score=1.0 - len(snippets) / max(self.k, 1),
                     symbol=None if d["qualname"] == MODULE_SYMBOL else d["qualname"],
-                    reason=f"graph rank {rank}",
+                    reason=f"graph rank {original_rank[node]}",
                 )
             )
             used += cost

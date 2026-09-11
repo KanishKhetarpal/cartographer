@@ -163,6 +163,77 @@ def test_a_long_symbol_is_truncated_to_its_head_not_dropped(repo):
     assert ctx.stats["truncated_snippets"] >= 1
 
 
+def test_file_diversity_reaches_a_second_file_within_k(tmp_path):
+    """Three symbols named directly in one file rank ahead of a fourth in a
+    different file (measured, not assumed -- see
+    eval/probe_snippet_diversity.py, which found this costing recall on real
+    instances). Without diversification, k=2 would spend entirely inside the
+    first file and the second file would never be offered at all."""
+    write(
+        tmp_path,
+        {
+            "pkg/__init__.py": "",
+            "pkg/busy.py": """
+            def alpha(v):
+                return v
+
+
+            def beta(v):
+                return v
+
+
+            def gamma(v):
+                return v
+            """,
+            "pkg/quiet.py": "def delta(v):\n    return v\n",
+        },
+    )
+    cg = build_graph(tmp_path)
+    text = "alpha() and beta() and gamma() are all wrong, and so is delta()"
+
+    order, _ = GraphRetriever(graph=cg).rank(issue(text), cg)
+    paths = [cg.g.nodes[n]["path"] for n in order]
+    assert paths[:3] == ["pkg/busy.py"] * 3, (
+        "test is vacuous unless the raw ranking already puts three busy.py "
+        "symbols ahead of quiet.py's"
+    )
+
+    ctx = GraphRetriever(k=2, graph=cg).retrieve(issue(text), RepoRef(root=tmp_path))
+    assert {s.path for s in ctx.snippets} == {"pkg/busy.py", "pkg/quiet.py"}
+
+
+def test_diversification_still_picks_each_file_s_best_node(tmp_path):
+    """Diversifying across files must not change *which* node represents a
+    file that does get more than one slot -- busy.py's best-ranked symbol,
+    not an arbitrary one, when k is large enough to reach a second busy.py
+    node too."""
+    write(
+        tmp_path,
+        {
+            "pkg/__init__.py": "",
+            "pkg/busy.py": """
+            def alpha(v):
+                return v
+
+
+            def beta(v):
+                return v
+
+
+            def gamma(v):
+                return v
+            """,
+            "pkg/quiet.py": "def delta(v):\n    return v\n",
+        },
+    )
+    cg = build_graph(tmp_path)
+    text = "alpha() and beta() and gamma() are all wrong, and so is delta()"
+
+    ctx = GraphRetriever(k=3, graph=cg).retrieve(issue(text), RepoRef(root=tmp_path))
+    busy_symbols = {s.symbol for s in ctx.snippets if s.path == "pkg/busy.py"}
+    assert "alpha" in busy_symbols, "the file's top-ranked symbol must still win its slot"
+
+
 # -- snippet fidelity ------------------------------------------------------
 
 
