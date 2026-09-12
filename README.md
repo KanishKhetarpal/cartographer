@@ -64,9 +64,12 @@ to have earned anything.
 | 10 | **0.684** | 0.633 |
 | 20 | **0.774** | 0.633 |
 
-**The graph contributes nothing at k≤3 and +5 to +14 points from k=5 out.** Below k=3 the issue's
-own text is already the whole answer. That is a weaker claim than a thesis about tight context
-wants, and it is reported rather than rounded off.
+**The graph contributes nothing at k≤3 and +5 to +14 points from k=5 out.** That's mostly
+structural, not a quality gap: evidence-first ordering pins every file the issue names ahead of
+anything inferred, and across these 59 instances the graph's first genuinely-inferred file lands
+at a median rank of 6 (only 19% have one in the top 3 at all) — so k≤3 is measuring how much
+evidence the issue itself provides, not how good the graph's inference is. Still a weaker claim
+than a thesis about tight context wants, and still reported rather than rounded off.
 
 Reproduce with `uv run python eval/graph_hit_rate.py <swebench.json> <repo-dir> --repos requests`;
 raw rows in [`results/phase1_hitrate.json`](results/phase1_hitrate.json).

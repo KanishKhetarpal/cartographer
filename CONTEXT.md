@@ -126,6 +126,25 @@ sympy 0.833/0.796 · pytest 0.737/0.553 · django 0.719/0.603 · **pylint 0.267/
 because its issues quote CLI flags and message codes rather than naming code. The split is total:
 all seven instances with ≤3 seeds scored 0.00 at every k; all three with ≥8 seeds scored 0.67-1.00.
 
+**"Nothing gained at k≤3" is mostly structural, not a quality miss — probed, not assumed.**
+`eval/probe_small_k_structure.py`, all 59 instances: per-instance divergence between graph and
+seeds-only is 0/59 at k=1, 0/59 at k=3, 2/59 at k=5, 4/59 at k=10, 11/59 at k=20 (not just tied in
+aggregate — literally the same files, per instance, at k≤3). Evidence-first ordering pins every
+seed file ahead of anything inferred, and blast_radius gives seed nodes the highest injected
+weight, so the graph's own top-ranked files are typically seed-associated too — the same set
+seeds-only already ranks first, by a different route. Measuring the rank of the first file in the
+graph's ranking that is **not** in that evidence set at all (the first position where graph and
+seeds-only could even possibly differ): median **rank 6** across the 59 (p25=4, p75=8); only 11/59
+(19%) have one within the top 3; 9/59 never show one in the top 20 at all.
+
+⚠️ **This reframes next-actions #1 rather than closes it.** The graph is not failing to add value
+at k≤3 — it structurally cannot show any there, for most instances, without deliberately ranking a
+less-confident inferred file above evidence the issue itself provided, which is the exact trade
+the never-worse-than-its-own-seeds invariant (§1) was built to refuse. The honest framing is: the
+graph's real contribution starts around median rank 6, which is exactly what k=5/k=10/k=20 already
+measure and report. "Nothing gained at k≤3" is a true statement about where the evidence pool ends,
+not a bug in the graph's ranking within it.
+
 **Embedding baseline, same 59 instances as the retrieval table** —
 `results/phase4_hitrate.json`, real `EmbeddingRetriever` (all-MiniLM-L6-v2, fixed 40-line chunks,
 cosine top-k, no function/class awareness):
@@ -326,8 +345,12 @@ guard. **When a mutation survives, check the mutation before trusting the test.*
 
 ## 10. Next actions, in order
 
-1. **Close the small-k gap** — still the headline weakness (nothing gained at k≤3). **Still open**
-   — neither item below touches it; both are real fixes to a different problem.
+1. ~~Close the small-k gap~~ — **reframed 2026-09-12, not "fixed" because it mostly isn't a
+   bug.** See §4: median rank 6 for the graph's first genuinely-inferred file across the 59
+   instances, so k≤3 is mostly structural (evidence-first + seed-weighted blast_radius), not a
+   quality miss. Don't re-open this as "make k≤3 better" without first deciding whether to trade
+   away the never-worse-than-seeds invariant — that's the actual lever, and it's a real design
+   trade-off, not a bug fix. What remains legitimately open:
    - ~~Probe whether literal seeding (CLI flags, message codes) reaches pylint's gold files~~ —
      done 2026-09-10, see §4. **It mostly does not: 2/10.** The lever is not "index the literals
      pylint's issues already contain" — that premise is mostly false. Either a smaller, more
