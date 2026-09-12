@@ -30,6 +30,14 @@ The graph contributes nothing at k<=3, where the issue's own text is already
 the whole answer, and +5 to +14 points from k=5 out. That is a weaker claim
 than a thesis about tight context wants, and it is recorded rather than rounded
 off.
+
+Mostly structural, not a quality gap in the ranking: evidence-first ordering
+(above) pins every seed file ahead of anything inferred, and blast_radius gives
+seed nodes the highest injected weight, so the top of the graph's own ranking
+is typically seed-associated too. Measured across the same 59 instances
+(eval/probe_small_k_structure.py): the graph's first genuinely-inferred file
+lands at a median rank of 6, and only 19% have one in the top 3 at all. k<=3 is
+measuring the evidence pool the issue provides, not this file's contribution.
 """
 
 from __future__ import annotations
