@@ -36,6 +36,9 @@ embedding = [
     "faiss-cpu>=1.8",
     "sentence-transformers>=3.0",
 ]
+mcp = [
+    "mcp>=1.0",
+]
 
 [project.scripts]
 cartographer = "cartographer.cli:app"
