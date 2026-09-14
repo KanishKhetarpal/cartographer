@@ -46,7 +46,7 @@ endings, which a Linux container reads as part of every path and command — see
 | 3 | LangGraph agent loop | |
 | 4 | Embedding baseline + the ≥50-task comparison | retrieval half ✅, resolved-rate half needs Phase 3 |
 | 5 | README polish, CI, architecture diagram | CI ✅, diagram ✅, demo GIF outstanding |
-| 6 | Stretch: MCP server | |
+| 6 | Stretch: MCP server | ✅ two real tools, neither calls a model — see below; demo GIF outstanding |
 
 ### Where the graph stands today
 
@@ -250,6 +250,28 @@ Two design lines worth stating up front, because both cost something to hold:
   measuring the branch instead of the graph.
 - **Analyzers are file-local and syntactic; the graph builder owns every cross-file
   resolution.** A new language costs one `LanguageAnalyzer`, not a new builder.
+
+## MCP server
+
+Two tools, so an IDE agent (Claude Code, Cursor) can call the retriever directly instead of this
+project building an agent loop to compete with one — matches the thesis above: the contribution is
+the retriever, not the loop.
+
+- **`resolve_issue(repo, issue, mode="graph", k=12, budget_tokens=8000)`** — the graph-grounded
+  `Context` (ranked files, snippets, token estimate) an agent needs to do the fix. Same retriever
+  the CLI and every eval number use.
+- **`blast_radius(repo, issue, hops=3, min_confidence=0.0, limit=20)`** — the raw ranking underneath
+  it: which symbols the graph reached from the issue's own seeds, with score, hop distance and
+  provenance. No snippets, no token budget.
+
+**Neither tool calls a model or produces a patch.** `agent/orchestrator.py`'s `STUB_PATCH` (Phase 3,
+not started) is never wired to `resolve_issue` — a tool with that name returning a placeholder
+patch would look like a real resolution to a calling agent that only reads the response shape.
+
+```bash
+uv sync --extra mcp
+uv run python -m cartographer.mcp.server   # stdio transport
+```
 
 ## License
 

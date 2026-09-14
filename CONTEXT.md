@@ -5,7 +5,7 @@ Working context for whoever picks this up next. Read this first, then `README.md
 where this file disagrees.**
 
 Repo: <https://github.com/KanishKhetarpal/cartographer> (private). Local: `~/projects/cartographer`.
-Last updated: 2026-09-10.
+Last updated: 2026-09-14.
 
 ---
 
@@ -38,26 +38,30 @@ Four invariants, all load-bearing in code:
 | 3 — LangGraph agent loop | not started; **needs a spending decision**, §7 |
 | 4 — embedding baseline + the comparison | **retrieval-side done** 2026-09-10: real `EmbeddingRetriever`, `embedding_hit_rate.py`, and the full graph-vs-embedding run on the same 59 instances Phase 1 used — see §4. The resolved-rate half still needs Phase 3. |
 | 5 — README/CI/diagram polish | CI done; README has results, worked example and a self-generated diagram; demo GIF outstanding |
-| 6 — MCP server (stretch) | not started |
+| 6 — MCP server (stretch) | **done** 2026-09-14: `mcp/server.py`, two real tools (`resolve_issue`, `blast_radius`), both wired to the shipped retriever/blast_radius, neither calls a model. Demo GIF (kickoff §6) outstanding. |
 
 **Real now:** `graph/python_analyzer.py`, `graph/graph_builder.py`, `graph/blast_radius.py`,
 `retrieval/seeds.py`, `retrieval/graph_retriever.py`, `retrieval/embedding_retriever.py`,
-`graph/render.py`, `cli.py`, `sandbox/docker_runner.py`, `sandbox/_win_launcher.py`, and in `eval/`:
-`graph_hit_rate.py`, `embedding_hit_rate.py`, `ablation.py`, `worked_example.py`, `report.py`.
+`graph/render.py`, `cli.py`, `mcp/server.py`, `sandbox/docker_runner.py`,
+`sandbox/_win_launcher.py`, and in `eval/`: `graph_hit_rate.py`, `embedding_hit_rate.py`,
+`ablation.py`, `worked_example.py`, `report.py`.
 
 **Still a placeholder, and says so in its own docstring:** `agent/orchestrator.py`, which is
 straight-line and emits `STUB_PATCH` with no model call. Scoring `STUB_PATCH` through the sandbox
 would report 0/N resolved on every instance — correctly, since it's a no-op diff against a file
 named `PLACEHOLDER` — but that number means nothing until Phase 3 produces real patches.
+`mcp/server.py`'s `resolve_issue` tool does **not** call it, on purpose — see its own module
+docstring and §4 below: wiring an MCP tool named `resolve_issue` to a stub patch would be exactly
+the kind of stubbed-but-scoreable-looking result the invariants in §1 exist to rule out.
 (`retrieval/stub.py` is gone — deleted once `EmbeddingRetriever` stopped needing a placeholder.)
 
 **Not created yet, deliberately** — an empty file that pretends to exist is worse than an absent
 one: `llm/client.py`, `eval/run_eval.py` (the ≥50-task sweep — waits on Phase 3 for real patches
-and Phase 4 for the baseline to compare against), `mcp/server.py`.
+and Phase 4 for the baseline to compare against).
 
 CI: `.github/workflows/ci.yml` — lint (`--no-fix`), mypy, build, tests, then a guard that reads the
 junit report and **fails on fewer than 80 tests or any skip under `CI=true`**. Green at HEAD with
-154 tests, 0 skipped.
+163 tests, 0 skipped.
 
 ---
 
@@ -211,6 +215,18 @@ ablation rankings together are 0.7s; the rest is `git checkout` across 2929 file
 evicts the page cache the next build wants. Budget by checkout cost, not by build cost -- I
 launched a 179-instance run estimating 25 minutes and it was on track for nearly four hours.
 
+**MCP server (`mcp/server.py`), verified 2026-09-14** — two tools, both thin wrappers around the
+shipped retriever/blast_radius (`_resolve_issue`, `_blast_radius_query`; the `mcp`-decorated
+versions are proven equal to them in `tests/test_mcp_server.py`). Round-tripped a real tool call
+through the actual protocol layer, not just the plain functions: `build_server().call_tool(...)`
+against the requests fixture returned correctly serialized JSON (seeds, ranked nodes with
+distance/reasons, stats) -- confirms the MCP wiring itself works, not only the logic underneath
+it. The `mcp` package (~20 transitive packages: starlette, uvicorn, jsonrpc plumbing) is imported
+lazily inside `build_server()`, never at module level, so the module and its tests collect and
+pass on the base CI install with no extras -- same pattern `embedding_retriever.py` uses for
+`sentence_transformers`. `uv sync --group dev` alone (163 tests) proves this; a live server needs
+`uv sync --extra mcp`.
+
 ---
 
 ## 5. Commands
@@ -223,10 +239,11 @@ export PATH="/c/Users/Kanish/AppData/Roaming/Python/Python312/Scripts:$PATH"
 
 ```bash
 uv sync --group dev
-uv run pytest                       # 154 tests
+uv run pytest                       # 163 tests
 uv run ruff check .                 # must be clean; CI lint never --fix
 uv run --with mypy mypy cartographer --ignore-missing-imports
 uv run cartographer resolve --repo . --issue issue.txt --mode graph --k 6
+uv sync --extra mcp && uv run python -m cartographer.mcp.server   # stdio MCP server
 
 F=../_fixtures; D=$F/swebench_verified.json
 uv run python eval/graph_hit_rate.py  $D $F --repos requests --quiet
