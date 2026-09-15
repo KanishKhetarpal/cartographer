@@ -12,6 +12,7 @@ defects the flask run exposed are pinned by name:
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -129,6 +130,27 @@ def test_node_for_line_returns_the_innermost_symbol(tmp_path):
     )
     assert cg.node_for_line("m.py", 3) == node_id("m.py", "C.meth")
     assert cg.node_for_line("m.py", 1) == node_id("m.py", "C")
+
+
+def test_symbols_in_lists_every_node_declared_in_one_file(tmp_path):
+    """Unused anywhere in the codebase today, but it's real public API on
+    CodeGraph, not dead internal code -- worth the same guarantee the rest of
+    the class gets rather than trusting a one-liner by inspection."""
+    cg = build_graph(
+        write(
+            tmp_path,
+            {
+                "a.py": "class C:\n    def meth(self):\n        pass\n",
+                "b.py": "def f():\n    pass\n",
+            },
+        )
+    )
+    assert set(cg.symbols_in("a.py")) == {
+        node_id("a.py", MODULE_SYMBOL),
+        node_id("a.py", "C"),
+        node_id("a.py", "C.meth"),
+    }
+    assert node_id("b.py", "f") not in cg.symbols_in("a.py")
 
 
 # -- call resolution -------------------------------------------------------
@@ -335,6 +357,30 @@ def test_an_unparseable_file_is_skipped_and_the_scan_continues(tmp_path):
     )
     assert cg.stats["files"] == 1
     assert cg.stats["parse_errors"] == 1
+    assert node_id("good.py", "g") in cg.g
+    assert node_id("bad.py", "f") not in cg.g
+
+
+def test_an_unreadable_file_is_skipped_and_the_scan_continues(tmp_path, monkeypatch):
+    """Distinct from the unparseable-file case above: this file can't even be
+    read -- a permission error, a race where it's deleted mid-scan, whatever
+    OSError -- rather than failing to parse once read. Same "one bad file
+    must not abort the scan" guarantee, different code path (the except
+    OSError around the read_text() call, not the analyzer's own error
+    handling), and it was completely unexercised: this is the whole reason
+    build() catches OSError there at all rather than letting it propagate."""
+    write(tmp_path, {"bad.py": "def f():\n    pass\n", "good.py": "def g():\n    pass\n"})
+    real_read_text = Path.read_text
+
+    def flaky_read_text(self, *args, **kwargs):
+        if self.name == "bad.py":
+            raise OSError("permission denied")
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", flaky_read_text)
+    cg = build_graph(tmp_path)
+    assert cg.stats["parse_errors"] == 1
+    assert "permission denied" in cg.stats["errors"][0]
     assert node_id("good.py", "g") in cg.g
     assert node_id("bad.py", "f") not in cg.g
 
