@@ -145,6 +145,34 @@ def test_min_confidence_excludes_weakly_resolved_call_edges(tmp_path):
     assert target not in {r.node for r in strict.ranked}
 
 
+def test_min_confidence_excludes_weakly_resolved_caller_edges(tmp_path):
+    """The sibling test above covers the forward direction: filtering a
+    weakly-resolved *callee* when walking from its caller. That exercises
+    `_neighbours()`'s out_edges branch only. The backward direction --
+    filtering a weakly-resolved *caller* when walking from the callee -- is
+    a genuinely different branch (the in_edges confidence check) and had no
+    test at all. It matters specifically because "callers outrank callees"
+    (this file's own thesis, line 4) is hollow if finding a caller doesn't
+    respect the same confidence floor finding a callee does.
+    """
+    cg = build_graph(
+        write(
+            tmp_path,
+            {
+                "m.py": "def f(obj):\n    obj.singular_name()\n",
+                "other.py": "class K:\n    def singular_name(self):\n        pass\n",
+            },
+        )
+    )
+    caller = node_id("m.py", "f")
+    seed = node_id("other.py", "K.singular_name")
+    assert caller in {r.node for r in blast_radius(cg, [seed]).ranked}, (
+        "test is vacuous unless the weak edge is used at all"
+    )
+    strict = blast_radius(cg, [seed], min_confidence=0.8)
+    assert caller not in {r.node for r in strict.ranked}
+
+
 def test_module_nodes_are_excluded_unless_asked_for(chain):
     seed = node_id("pkg/middle.py", "middle")
     plain = {r.node for r in blast_radius(chain, [seed]).ranked}
