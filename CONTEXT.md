@@ -5,7 +5,7 @@ Working context for whoever picks this up next. Read this first, then `README.md
 where this file disagrees.**
 
 Repo: <https://github.com/KanishKhetarpal/cartographer> (private). Local: `~/projects/cartographer`.
-Last updated: 2026-09-14.
+Last updated: 2026-09-15.
 
 ---
 
@@ -61,7 +61,7 @@ and Phase 4 for the baseline to compare against).
 
 CI: `.github/workflows/ci.yml` — lint (`--no-fix`), mypy, build, tests, then a guard that reads the
 junit report and **fails on fewer than 80 tests or any skip under `CI=true`**. Green at HEAD with
-163 tests, 0 skipped.
+170 tests, 0 skipped.
 
 ---
 
@@ -224,7 +224,7 @@ distance/reasons, stats) -- confirms the MCP wiring itself works, not only the l
 it. The `mcp` package (~20 transitive packages: starlette, uvicorn, jsonrpc plumbing) is imported
 lazily inside `build_server()`, never at module level, so the module and its tests collect and
 pass on the base CI install with no extras -- same pattern `embedding_retriever.py` uses for
-`sentence_transformers`. `uv sync --group dev` alone (163 tests) proves this; a live server needs
+`sentence_transformers`. `uv sync --group dev` alone (170 tests) proves this; a live server needs
 `uv sync --extra mcp`.
 
 ---
@@ -239,7 +239,7 @@ export PATH="/c/Users/Kanish/AppData/Roaming/Python/Python312/Scripts:$PATH"
 
 ```bash
 uv sync --group dev
-uv run pytest                       # 163 tests
+uv run pytest                       # 170 tests
 uv run ruff check .                 # must be clean; CI lint never --fix
 uv run --with mypy mypy cartographer --ignore-missing-imports
 uv run cartographer resolve --repo . --issue issue.txt --mode graph --k 6
