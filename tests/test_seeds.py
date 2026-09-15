@@ -11,7 +11,7 @@ import textwrap
 
 import pytest
 
-from cartographer.graph.graph_builder import build_graph, node_id
+from cartographer.graph.graph_builder import MODULE_SYMBOL, build_graph, node_id
 from cartographer.retrieval.seeds import extract_seeds, seed_files
 
 
@@ -83,6 +83,65 @@ def test_a_name_matching_too_many_definitions_is_not_a_seed(tmp_path):
     assert extract_seeds("`dup` is broken", cg) == []
 
 
+def test_a_backticked_dotted_name_also_weakly_seeds_a_same_named_sibling(tmp_path):
+    """`Response.json` resolves unambiguously via its full qualname -- but the
+    code-span extractor also bumps the bare short name ("json") as its own,
+    separately-weighted (1.6) candidate. That candidate falls back to
+    by_short, which returns *every* symbol named `json` anywhere, not just
+    the one the full name already resolved. So a second, unrelated
+    `Other.json` gets a weak nomination too (share of 1.6 / 2 hits = 0.8): a
+    hedge for when the issue's author meant a different class with the same
+    method name.
+
+    The exact weight matters for this test to mean anything: a *generic*
+    fallback already exists too (any dotted identifier anywhere in the text
+    is also picked up by the plain-identifier loop and bumped at 1.0, short
+    name at 0.8/2=0.4) -- so "the sibling gets seeded at all" is true even
+    with the code-span-specific bump deleted, and a first draft of this test
+    asserted exactly that and passed against the mutated code. Pinning 0.8
+    (not just "> 0" or "less than primary") is what actually distinguishes
+    the code-span-strength evidence this test targets from the generic one.
+    """
+    cg = build_graph(
+        write(
+            tmp_path,
+            {
+                "pkg/__init__.py": "",
+                "pkg/models.py": "class Response:\n    def json(self):\n        return {}\n",
+                "pkg/other.py": "class Other:\n    def json(self):\n        return {}\n",
+            },
+        )
+    )
+    weights = {s.node: s.weight for s in extract_seeds("`Response.json` is wrong", cg)}
+    primary = node_id("pkg/models.py", "Response.json")
+    sibling = node_id("pkg/other.py", "Other.json")
+    assert weights[primary] == 2.0
+    assert weights[sibling] == 0.8
+
+
+def test_a_dotted_call_also_weakly_seeds_a_same_named_sibling(tmp_path):
+    """Same fan-out as the code-span test above, through the `_CALLED`
+    (parenthesised, un-backticked) pattern instead -- a separate branch in
+    _identifiers(), also unguarded before this test, same reason the exact
+    weight (1.3 / 2 hits = 0.65, not the generic loop's 0.8/2=0.4) is the
+    part that actually distinguishes this from the generic fallback."""
+    cg = build_graph(
+        write(
+            tmp_path,
+            {
+                "pkg/__init__.py": "",
+                "pkg/models.py": "class Response:\n    def json(self):\n        return {}\n",
+                "pkg/other.py": "class Other:\n    def json(self):\n        return {}\n",
+            },
+        )
+    )
+    weights = {s.node: s.weight for s in extract_seeds("Response.json() is wrong", cg)}
+    primary = node_id("pkg/models.py", "Response.json")
+    sibling = node_id("pkg/other.py", "Other.json")
+    assert weights[primary] == 1.5
+    assert weights[sibling] == 0.65
+
+
 def test_a_call_written_in_prose_is_seeded(seedrepo):
     """`entry() returns one too many` must seed `entry`. This was a real miss:
     a bare lowercase word is prose, but parens make it unambiguously code, and
@@ -117,12 +176,42 @@ def test_a_permalink_without_a_line_still_seeds_the_file(seedrepo):
     assert seed_files(url, seedrepo) == ["pkg/other.py"]
 
 
+def test_a_permalink_without_a_line_seeds_the_module_node_via_extract_seeds(seedrepo):
+    """The test above only proves seed_files() (the generic path-mention
+    pathway, `_PATH` matching the URL's trailing segment) finds the file.
+    extract_seeds() has its own, separate _BLOB_URL branch for a permalink
+    with no line number, which offers the *module* node with its own
+    "permalink" evidence and 1.6 weight -- distinct code, and unguarded: it
+    was still passing the full suite with that branch's body deleted
+    entirely. This calls extract_seeds() directly so a regression there
+    can't hide behind seed_files() happening to work for a different
+    reason."""
+    url = "https://github.com/org/proj/blob/abc123/pkg/other.py"
+    seeds = extract_seeds(url, seedrepo)
+    assert seeds, "test is vacuous unless the permalink actually seeds something"
+    matches = [s for s in seeds if "permalink" in s.evidence]
+    assert matches, f"no permalink-evidenced seed among {[s.evidence for s in seeds]}"
+    assert matches[0].node == node_id("pkg/other.py", MODULE_SYMBOL)
+    assert matches[0].weight == 1.6
+
+
 def test_a_url_prefixed_path_is_matched_by_trimming_leading_segments(seedrepo):
     from cartographer.retrieval.seeds import match_path
 
     known = list(seedrepo.paths)
     assert match_path("github.com/org/proj/blob/abc/pkg/models.py", known) == ["pkg/models.py"]
     assert match_path("pkg/models.py", known) == ["pkg/models.py"]
+
+
+def test_a_path_matching_nothing_at_any_trim_level_is_not_a_seed(seedrepo):
+    """Distinct from the ambiguous case below: this path never matches *any*
+    known file at *any* prefix-trim level, not even multiple candidates --
+    match_path's final fallthrough. Unreached before this test: mutating that
+    return into a non-empty sentinel still passed the whole suite."""
+    from cartographer.retrieval.seeds import match_path
+
+    known = list(seedrepo.paths)
+    assert match_path("nowhere/nothing.py", known) == []
 
 
 def test_an_ambiguous_bare_basename_nominates_nothing(tmp_path):
