@@ -14,13 +14,14 @@ to bind.
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 import pytest
 
 from cartographer.graph.blast_radius import blast_radius
 from cartographer.graph.graph_builder import build_graph, node_id
 from cartographer.retrieval.base import Issue, RepoRef
-from cartographer.retrieval.graph_retriever import GraphRetriever
+from cartographer.retrieval.graph_retriever import CHARS_PER_TOKEN, GraphRetriever
 from cartographer.retrieval.seeds import extract_seeds
 
 CALLER_TEMPLATE = """
@@ -150,6 +151,49 @@ def test_the_budget_bounds_the_total(repo):
     assert ctx.token_estimate <= 200 or len(ctx.snippets) == 1
 
 
+def test_retrieve_skips_an_oversized_snippet_but_keeps_filling(tmp_path):
+    """Mirrors test_embedding_retriever.py's
+    test_retrieve_skips_an_oversized_chunk_but_keeps_filling -- the same
+    check exists on this side (`if snippets and used + cost > budget_tokens`)
+    but was unguarded here. A different code path from
+    test_a_tiny_budget_still_yields_one_snippet above: that one exhausts the
+    budget on the very first snippet, so the *outer* loop-exit check
+    (`used >= budget_tokens`) is what stops it, without ever reaching the
+    inner per-snippet check. Here `used` stays under budget throughout, so
+    only the inner check can explain top and low both appearing while mid
+    (oversized) does not."""
+    write(
+        tmp_path,
+        {
+            "pkg/__init__.py": "",
+            "pkg/top.py": "from pkg.mid import mid\n\n\ndef top():\n    return mid()\n",
+            "pkg/mid.py": (
+                "from pkg.low import low\n\n\ndef mid():\n"
+                f"    x = '{'b' * 44}'\n    return low()\n"
+            ),
+            "pkg/low.py": "def low():\n    pass\n",
+        },
+    )
+    cg = build_graph(tmp_path)
+    text = "top() is wrong"
+
+    order, _ = GraphRetriever(graph=cg).rank(issue(text), cg)
+    paths = [cg.g.nodes[n]["path"] for n in order]
+    assert paths == ["pkg/top.py", "pkg/mid.py", "pkg/low.py"], (
+        "test is vacuous unless the rank order is exactly top, mid, low"
+    )
+
+    unbudgeted = GraphRetriever(k=10, graph=cg).retrieve(issue(text), RepoRef(root=tmp_path))
+    costs = {s.path: len(s.text) // CHARS_PER_TOKEN for s in unbudgeted.snippets}
+    # Enough room for top and low together, not enough left after top for mid.
+    budget = costs["pkg/top.py"] + costs["pkg/low.py"] + 1
+
+    ctx = GraphRetriever(k=10, graph=cg).retrieve(
+        issue(text), RepoRef(root=tmp_path), budget_tokens=budget
+    )
+    assert [s.path for s in ctx.snippets] == ["pkg/top.py", "pkg/low.py"]
+
+
 def test_a_long_symbol_is_truncated_to_its_head_not_dropped(repo):
     filler = chr(10).join(f"    x{i} = {i}" for i in range(300))
     write(repo, {"pkg/target.py": f"def broken(value):{chr(10)}{filler}{chr(10)}    return value"})
@@ -243,6 +287,55 @@ def test_every_snippet_text_matches_its_declared_span(cg, repo):
     for s in ctx.snippets:
         lines = (repo / s.path).read_text(encoding="utf-8").splitlines()
         assert s.text.splitlines() == lines[s.start_line - 1 : s.end_line]
+
+
+def test_a_file_that_becomes_unreadable_is_skipped_not_fatal(cg, repo, monkeypatch):
+    """The graph is built from source at build time; retrieve() reads
+    snippet text again at retrieve time. If the file changed underneath in
+    between -- deleted, permission revoked, whatever OSError -- that must
+    skip the one snippet, not crash retrieval. _read()'s own OSError guard
+    (graph_retriever.py) is what makes this possible; unguarded before this
+    test, same as the analogous build()-time guard in graph_builder.py."""
+    real_read_text = Path.read_text
+
+    def flaky(self, *args, **kwargs):
+        if self.name == "target.py":
+            raise OSError("vanished")
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", flaky)
+    ctx = GraphRetriever(k=6, graph=cg).retrieve(issue("broken() is wrong"), RepoRef(root=repo))
+    assert "pkg/target.py" not in {s.path for s in ctx.snippets}
+    assert ctx.snippets, "test is vacuous unless something else was still retrievable"
+
+
+def test_a_symbol_whose_file_shrank_since_the_graph_was_built_is_skipped(tmp_path):
+    """A different desync from the test above: the file is still readable,
+    but shorter than it was when the graph indexed it (edited, or checked
+    out to a different revision, without a rebuild -- exactly what an eval
+    sweep does when it reuses one injected graph across configurations, see
+    test_an_injected_graph_is_reused_rather_than_rebuilt below). The stale
+    index's end_line can then exceed the file's real line count, making
+    end < start; that must skip the snippet, not emit a garbage
+    empty-or-negative span. Needs broken() to start past line 1 -- the
+    shared `repo` fixture has it on line 1, where a file can never shrink
+    below its own start line, so this uses its own fixture instead."""
+    write(
+        tmp_path,
+        {
+            "pkg/__init__.py": "",
+            "pkg/target.py": "# padding\n" * 5 + "def broken(value):\n    return value + 1\n",
+            "pkg/caller.py": (
+                "from pkg.target import broken\n\n\ndef entry(value):\n    return broken(value)\n"
+            ),
+        },
+    )
+    cg = build_graph(tmp_path)
+    (tmp_path / "pkg/target.py").write_text("def broken(value):\n    pass\n", encoding="utf-8")
+
+    ctx = GraphRetriever(k=6, graph=cg).retrieve(issue("broken() is wrong"), RepoRef(root=tmp_path))
+    assert "pkg/target.py" not in {s.path for s in ctx.snippets}
+    assert ctx.snippets, "test is vacuous unless something else was still retrievable"
 
 
 def test_an_issue_matching_nothing_yields_an_empty_context(cg, repo):
